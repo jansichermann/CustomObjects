@@ -7,7 +7,7 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "Macros.h"
+#import "ModelMacros.h"
 
 @class BaseModelObject;
 

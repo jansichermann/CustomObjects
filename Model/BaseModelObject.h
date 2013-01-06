@@ -18,7 +18,7 @@
 // limitations under the License.
 
 #import <Foundation/Foundation.h>
-#import "Macros.h"
+#import "ModelMacros.h"
 #import "ModelManager.h"
 
 
