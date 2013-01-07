@@ -18,14 +18,13 @@
 
 #import <Foundation/Foundation.h>
 #import "ModelMacros.h"
-#import "ModelManager.h"
-
 
 typedef enum {
     ModelCachingNever = 0,      // never cache this object
     ModelCachingAlways          // always cache this object
 } ModelCachingBehavior;
 
+@class BaseModelObject;
 
 typedef void(^OnDiskMergeBlock)(BaseModelObject *);
 

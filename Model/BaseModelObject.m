@@ -17,6 +17,7 @@
 // limitations under the License.
 
 #import "BaseModelObject.h"
+#import "ModelManager.h"
 
 #define DISKMERGE 0
 
