@@ -43,6 +43,11 @@ if (_value != nil) { \
     _var = _value; \
 }
 
+#define DISK_MERGE_SET_VAR(_var, _value) \
+if (_var == nil && _value != nil && [_var isKindOfClass:_value.class]) { \
+    _var = _value; \
+}
+
 // single property
 
 #define MODEL_SINGLE_PROPERTY_H_INTERFACE(_class, _name) \
