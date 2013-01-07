@@ -19,7 +19,7 @@
 #import "BaseModelObject.h"
 #import "ModelManager.h"
 
-#define DISKMERGE 0
+#define DISKMERGE 1
 
 @interface BaseModelObject ()
 
@@ -50,12 +50,10 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 }
 
 + (id)objectWithId:(NSString *)objectId cached:(BOOL)cached {
-    BaseModelObject *modelObject = [[ModelManager shared] fetchObjectFromCacheWithClass:self andId:objectId];
+    BaseModelObject *modelObject = nil;
     
-    modelObject ? NSLog(@"found object in cache id: %@", modelObject.objectId) : nil ;
-    
+    if (modelObject == nil && cached) {
 #if DISKMERGE
-    if (modelObject == nil) {
         modelObject = [self newObjectWithId:objectId cached:cached];
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             
@@ -64,15 +62,13 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
                 [modelObject mergeWithDiskModel:bm];
             }
         });
-    }
 #else
-    if (modelObject == nil && cached) {
         modelObject = [[ModelManager shared] fetchObjectFromDiskWithClass:self andId:objectId];
-    }
-    if (modelObject == nil) {
-        modelObject = [self newObjectWithId:objectId cached:cached];
-    }
+        if (modelObject == nil) {
+            modelObject = [self newObjectWithId:objectId cached:cached];
+        }
 #endif
+    }
     
     return modelObject;
 }
