@@ -52,6 +52,10 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 + (id)objectWithId:(NSString *)objectId cached:(BOOL)cached {
     BaseModelObject *modelObject = nil;
     
+    if (cached) {
+        modelObject = [[ModelManager shared] fetchObjectFromCacheWithClass:self.class andId:objectId];
+    }
+    
     if (modelObject == nil && cached) {
 #if DISKMERGE
         modelObject = [self newObjectWithId:objectId cached:cached];
@@ -64,12 +68,12 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
         });
 #else
         modelObject = [[ModelManager shared] fetchObjectFromDiskWithClass:self andId:objectId];
-        if (modelObject == nil) {
-            modelObject = [self newObjectWithId:objectId cached:cached];
-        }
 #endif
     }
     
+    if (modelObject == nil) {
+        modelObject = [self newObjectWithId:objectId cached:cached];
+    }
     return modelObject;
 }
 
@@ -82,12 +86,8 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 }
 
 #if DISKMERGE
-- (void)mergeWithDiskModel:(BaseModelObject *)diskModel {
-    if ([self.createdAt isKindOfClass:diskModel.createdAt.class]) {
-        if (self.createdAt == nil && diskModel.createdAt != nil) {
-            self.createdAt = diskModel.createdAt;
-        }
-    }
+- (void)mergeWithDiskModel:(NSObject<DateCreationProtocol> *)diskModel {
+    DISK_MERGE_SET_VAR(self.createdAt, diskModel.createdAt);
     
     if (self.onDiskMergeBlock != nil) {
         self.onDiskMergeBlock(self);

@@ -19,16 +19,28 @@
 #import <Foundation/Foundation.h>
 #import "ModelMacros.h"
 
+
 typedef enum {
     ModelCachingNever = 0,      // never cache this object
     ModelCachingAlways          // always cache this object
 } ModelCachingBehavior;
 
-@class BaseModelObject;
 
-typedef void(^OnDiskMergeBlock)(BaseModelObject *);
+typedef void(^OnDiskMergeBlock)(id); // using id to support subclasses
 
-@interface BaseModelObject : NSObject
+
+
+#pragma mark - BaseModel Protocols
+
+@protocol DateCreationProtocol <NSObject>
+- (NSDate *)createdAt;
+@end
+
+
+
+#pragma mark - BaseModel Interface
+
+@interface BaseModelObject : NSObject <DateCreationProtocol>
 
 @property (nonatomic) ModelCachingBehavior shouldCacheModel;
 @property (copy) OnDiskMergeBlock onDiskMergeBlock;
@@ -37,10 +49,12 @@ MODEL_SINGLE_PROPERTY_H_INTERFACE(NSDate, createdAt);
 MODEL_SINGLE_PROPERTY_H_INTERFACE(NSString, objectId);
 
 
+
 #pragma mark - Initialization
 + (id)newObjectWithId:(NSString *)objectId cached:(BOOL)cached;
 + (id)objectWithId:(NSString *)objectId cached:(BOOL)cached;
 + (id)withDictionary:(NSDictionary *)dict cached:(BOOL)cached;
+
 
 #pragma mark - Object updating
 - (BOOL)updateWithDictionary:(NSDictionary *)dict;
@@ -51,10 +65,15 @@ MODEL_SINGLE_PROPERTY_H_INTERFACE(NSString, objectId);
 - (BaseModelObject *)initWithCoder:(NSCoder *)decoder;
 
 
+#pragma mark - Disk Merging
+- (void)mergeWithDiskModel:(NSObject<DateCreationProtocol> *)diskModel;
+
+
 #pragma mark - Caching behavior
 - (BOOL)shouldCacheModelObject;
 - (BOOL)shouldPersistModelObject;
 
 - (void)persistToPath:(NSString *)path;
 + (id)loadFromPath:(NSString *)path;
+
 @end
