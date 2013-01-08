@@ -44,7 +44,7 @@ if (_value != nil) { \
 }
 
 #define DISK_MERGE_SET_VAR(_var, _value) \
-if (_var == nil && _value != nil && [_var isKindOfClass:_value.class]) { \
+if (_var == nil && _value != nil) { \
     _var = _value; \
 }
 
