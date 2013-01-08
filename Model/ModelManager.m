@@ -149,14 +149,10 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
         bm = [BaseModelObject loadFromPath:path];
     });
 
-    // and schedule the addition of the object to the queue asynchronously
-    // so we can return as fast as possible. Addition to the queue happens at a
-    // very low priority
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
-        if (bm != nil && bm.shouldCacheModel) {
-            [self addObjectToCache:bm];
-        }
-    });
+    // we purposefully do not add the fetched object to the cache
+    // since objectWithId: will create a new object and set it in the cache
+    // we do not want to override that one
+    // further, the mergeWithDiskModel: will handle merging these two objects
     
     return bm;
 }
