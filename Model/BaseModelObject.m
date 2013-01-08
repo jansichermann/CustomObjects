@@ -39,11 +39,14 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     }
     
     BaseModelObject *m = [[self alloc] init];
-    m.shouldCacheModel = ModelCachingAlways;
+    m.shouldCacheModel = cached ? ModelCachingAlways : ModelCachingNever;
     m.objectId = objectId;
     
     if (cached) {
         [[ModelManager shared] addObjectToCache:m];
+    }
+    else {
+        [[ModelManager shared] removeObjectFromCache:m];
     }
     
     return m;
@@ -87,7 +90,7 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 
 #if DISKMERGE
 - (void)mergeWithDiskModel:(NSObject<DateCreationProtocol> *)diskModel {
-    DISK_MERGE_SET_VAR(self.createdAt, diskModel.createdAt);
+    DISK_MERGE_SET_VAR([NSDate class], self.createdAt, diskModel.createdAt);
     
     if (self.onDiskMergeBlock != nil) {
         self.onDiskMergeBlock(self);
@@ -101,8 +104,8 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 
 - (BOOL)updateWithDictionary:(NSDictionary *)dict {
     if (dict[@"id"]) {
-        SET_IF_NOT_NIL(self.objectId, dict[@"id"]);
-        SET_IF_NOT_NIL(self.createdAt, [NSDate dateWithTimeIntervalSince1970:[dict[@"createdAt"] floatValue]]);
+        SET_IF_NOT_NIL([NSString class], self.objectId, dict[@"id"]);
+        SET_IF_NOT_NIL([NSDate class], self.createdAt, [NSDate dateWithTimeIntervalSince1970:[dict[@"createdAt"] floatValue]]);
 
         if ([self shouldCacheModelObject]) {
             [[ModelManager shared] addObjectToCache:self];
@@ -121,7 +124,9 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 }
 
 - (BaseModelObject *)initWithCoder:(NSCoder *)decoder {
-    self = [self.class newObjectWithId:[decoder decodeObjectForKey:@"objectId"] cached:YES];
+    // models from disk aren't cached as they would otherwise overwrite in-memory objects
+    // this should rather be handled with a merge
+    self = [self.class newObjectWithId:[decoder decodeObjectForKey:@"objectId"] cached:NO];
     self.createdAt = [decoder decodeObjectForKey:@"createdAt"];
     return self;
 }

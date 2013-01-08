@@ -38,13 +38,13 @@
 //
 
 // variable setting
-#define SET_IF_NOT_NIL(_var, _value) \
+#define SET_IF_NOT_NIL(_class, _var, _value) \
 if (_value != nil) { \
     _var = _value; \
 }
 
-#define DISK_MERGE_SET_VAR(_var, _value) \
-if (_var == nil && _value != nil) { \
+#define DISK_MERGE_SET_VAR(_class, _var, _value) \
+if (_var == nil && _value != nil && [_value isKindOfClass:_class]) { \
     _var = _value; \
 }
 
