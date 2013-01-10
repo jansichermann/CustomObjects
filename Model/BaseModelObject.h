@@ -28,9 +28,6 @@ typedef enum {
 } ModelCachingBehavior;
 
 
-typedef void(^OnDiskMergeBlock)(id); // using id to support subclasses
-
-
 
 #pragma mark - BaseModel Protocols
 
@@ -38,14 +35,16 @@ typedef void(^OnDiskMergeBlock)(id); // using id to support subclasses
 - (NSDate *)createdAt;
 @end
 
+@protocol ObjectIdProtocol <NSObject>
+- (NSString *)objectId;
+@end
 
 
 #pragma mark - BaseModel Interface
 
-@interface BaseModelObject : NSObject <DateCreationProtocol>
+@interface BaseModelObject : NSObject <DateCreationProtocol, ObjectIdProtocol>
 
 @property (nonatomic) ModelCachingBehavior shouldCacheModel;
-@property (copy) OnDiskMergeBlock onDiskMergeBlock;
 
 MODEL_SINGLE_PROPERTY_H_INTERFACE(NSDate, createdAt);
 MODEL_SINGLE_PROPERTY_H_INTERFACE(NSString, objectId);

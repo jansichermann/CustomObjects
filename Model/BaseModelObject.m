@@ -19,8 +19,6 @@
 #import "BaseModelObject.h"
 #import "ModelManager.h"
 
-#define DISKMERGE 1
-
 @interface BaseModelObject ()
 
 MODEL_SINGLE_PROPERTY_M_INTERFACE(NSDate, createdAt);
@@ -60,18 +58,8 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     }
     
     if (modelObject == nil && cached) {
-#if DISKMERGE
-        modelObject = [self newObjectWithId:objectId cached:cached];
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            
-            BaseModelObject *bm = [[ModelManager shared] fetchObjectFromDiskWithClass:self andId:objectId];
-            if (bm != nil) {
-                [modelObject mergeWithDiskModel:bm];
-            }
-        });
-#else
+        // we run into the issue of trying to fetch from disk every time
         modelObject = [[ModelManager shared] fetchObjectFromDiskWithClass:self andId:objectId];
-#endif
     }
     
     if (modelObject == nil) {
@@ -87,16 +75,6 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     }
     return nil;
 }
-
-#if DISKMERGE
-- (void)mergeWithDiskModel:(NSObject<DateCreationProtocol> *)diskModel {
-    DISK_MERGE_SET_VAR([NSDate class], self.createdAt, diskModel.createdAt);
-    
-    if (self.onDiskMergeBlock != nil) {
-        self.onDiskMergeBlock(self);
-    }
-}
-#endif
 
 #pragma mark - Object updating
 
