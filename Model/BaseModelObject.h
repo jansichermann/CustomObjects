@@ -66,10 +66,6 @@ MODEL_SINGLE_PROPERTY_H_INTERFACE(NSString, objectId);
 - (BaseModelObject *)initWithCoder:(NSCoder *)decoder;
 
 
-#pragma mark - Disk Merging
-- (void)mergeWithDiskModel:(NSObject<DateCreationProtocol> *)diskModel;
-
-
 #pragma mark - Caching behavior
 - (BOOL)shouldCacheModelObject;
 - (BOOL)shouldPersistModelObject;

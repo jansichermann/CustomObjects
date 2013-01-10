@@ -76,9 +76,8 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     return nil;
 }
 
+
 #pragma mark - Object updating
-
-
 
 - (BOOL)updateWithDictionary:(NSDictionary *)dict {
     if (dict[@"id"]) {
@@ -132,20 +131,28 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 }
 
 - (void)persistToPath:(NSString *)path {
-    NSLog(@"persisting object to path: %@", path);
-    NSData *data = [NSKeyedArchiver archivedDataWithRootObject:self];
-    [data writeToFile:path atomically:NO];
+    @try {
+        NSData *data = [NSKeyedArchiver archivedDataWithRootObject:self];
+        [data writeToFile:path atomically:NO];
+    }
+    @catch (NSException *exception) {
+        NSLog(@"### SOMETHING WENT WRONG TRYING TO PERSIST TO DISK ###");
+    }
+    @finally {
+    }
 }
 
 + (id)loadFromPath:(NSString *)path {
-    @try {
-        id obj = [NSKeyedUnarchiver unarchiveObjectWithFile:path];
-        return obj;
-    }
-    @catch (NSException *exception) {
-        NSLog(@"### SOMETHING TERRIBLE HAPPENED WHEN LOADING FROM DISK ###");
-    }
-    @finally {
+    if ([[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        @try {
+            id obj = [NSKeyedUnarchiver unarchiveObjectWithFile:path];
+            return obj;
+        }
+        @catch (NSException *exception) {
+            NSLog(@"### SOMETHING TERRIBLE HAPPENED WHEN LOADING FROM DISK ###");
+        }
+        @finally {
+        }
     }
     return nil;
 }
