@@ -69,6 +69,7 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
 }
 
 - (NSCache *)createCacheForClass:(Class)class {
+    NSAssert(class != nil, @"expected class");
     // create an appropriate id mapping
     NSMutableSet *idSet = [NSMutableSet set];
     self.modelCacheIds[[self stringNameForClass:class]] = idSet;
@@ -118,6 +119,7 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
     // dispatch_barrier waits for all currently executing blocks on the
     // queue to finish, then locks the queue, executes, and unlocks the queue.
     // during the execution of the barrier block, no other blocks run
+    NSAssert(object != nil, @"expected object to not be nil");
     dispatch_barrier_async(self.cacheQueue, ^{
         [[NSThread currentThread] isMainThread] ? NSLog(@"SHOULD BE DONE FROM BG THREAD") : nil;
         
