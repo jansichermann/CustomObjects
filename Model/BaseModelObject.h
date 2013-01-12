@@ -52,7 +52,7 @@ MODEL_SINGLE_PROPERTY_H_INTERFACE(NSString, objectId);
 
 
 #pragma mark - Initialization
-+ (id)newObjectWithId:(NSString *)objectId cached:(BOOL)cached;
++ (id)newObjectWithId:(NSString *)objectId;
 + (id)objectWithId:(NSString *)objectId cached:(BOOL)cached;
 + (id)withDictionary:(NSDictionary *)dict cached:(BOOL)cached;
 

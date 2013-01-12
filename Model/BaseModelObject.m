@@ -29,7 +29,11 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 
 @implementation BaseModelObject
 
+
 #pragma mark - Initialization
++ (id)newObjectWithId:(NSString *)objectId {
+    return [self newObjectWithId:objectId cached:NO];
+}
 
 + (id)newObjectWithId:(NSString *)objectId cached:(BOOL)cached {
     if (objectId == nil || objectId.length < 1) {
@@ -37,8 +41,12 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     }
     
     BaseModelObject *m = [[self alloc] init];
-    m.shouldCacheModel = cached ? ModelCachingAlways : ModelCachingNever;
+    // the object id needs to be set before the caching behavior
     m.objectId = objectId;
+    // as setShouldCacheModel will remove or add the object from or to the cache
+    // which requires an objectId
+    m.shouldCacheModel = cached ? ModelCachingAlways : ModelCachingNever;
+    
     
     if (cached) {
         [[ModelManager shared] addObjectToCache:m];
@@ -60,6 +68,7 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     if (modelObject == nil && cached) {
         // we run into the issue of trying to fetch from disk every time
         modelObject = [[ModelManager shared] fetchObjectFromDiskWithClass:self andId:objectId];
+        [[ModelManager shared] addObjectToCache:modelObject];
     }
     
     if (modelObject == nil) {
@@ -78,7 +87,6 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 
 
 #pragma mark - Object updating
-
 - (BOOL)updateWithDictionary:(NSDictionary *)dict {
     if (dict[@"id"]) {
         SET_IF_NOT_NIL([NSString class], self.objectId, dict[@"id"]);
@@ -94,28 +102,30 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 
 
 #pragma mark - NSCoding
-
 - (void)encodeWithCoder:(NSCoder *)encoder {
     [encoder encodeObject:self.objectId forKey:@"objectId"];
-    [encoder encodeObject:self.createdAt forKey:@"createdAt"];
+    [encoder encodeObject:@([self.createdAt timeIntervalSince1970]) forKey:@"createdAt"];
 }
 
 - (BaseModelObject *)initWithCoder:(NSCoder *)decoder {
     // models from disk aren't cached as they would otherwise overwrite in-memory objects
     // this should rather be handled with a merge
     self = [self.class newObjectWithId:[decoder decodeObjectForKey:@"objectId"] cached:NO];
-    self.createdAt = [decoder decodeObjectForKey:@"createdAt"];
+    self.createdAt = [NSDate dateWithTimeIntervalSince1970:[[decoder decodeObjectForKey:@"createdAt"] intValue]];
     return self;
 }
 
 
 #pragma mark - Caching behavior
 - (void)setShouldCacheModel:(ModelCachingBehavior)shouldCacheModel {
+
+    NSAssert(self.objectId != nil && self.objectId.length > 0, @"expected an objectId on the model");
+    
     _shouldCacheModel = shouldCacheModel;
     if (shouldCacheModel == ModelCachingAlways) {
         [[ModelManager shared] addObjectToCache:self];
     }
-    if (shouldCacheModel == ModelCachingNever ) {
+    if (shouldCacheModel == ModelCachingNever) {
         [[ModelManager shared] removeObjectFromCache:self];
     }
 }
@@ -126,6 +136,8 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     return NO;
 }
 
+
+#pragma mark - Persisting
 - (BOOL)shouldPersistModelObject {
     return [self shouldCacheModelObject];
 }

@@ -25,6 +25,10 @@
 
 SHARED_SINGLETON_HEADER(ModelManager);
 
+// can be queried to gain insight into whether a persist operation
+// is about to be, or currently being executed
+@property (readonly) BOOL persistScheduled;
+
 - (void)removeObjectFromCache:(BaseModelObject *)object;
 - (void)addObjectToCache:(BaseModelObject *)object;
 

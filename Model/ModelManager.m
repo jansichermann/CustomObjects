@@ -23,8 +23,11 @@
 static const NSUInteger DEFAULT_CACHE_LIMIT = 0;
 
 @interface ModelManager ()
+
+@property int persistCount;
+
 @property (nonatomic)   NSMutableDictionary *modelCache;
-@property               NSMutableDictionary *modelCacheIds;
+@property               NSMutableDictionary *modelCacheIds;     // since we cannot iterate over the NSCache in modelCache, we have to keep a reference to all possible ids
 
 
 // we have a single concurrent queue
@@ -43,9 +46,11 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
 - (id)init {
     self = [super init];
     if (self) {
+        [self diskCacheIds];
         self.modelCache = [NSMutableDictionary dictionary];
         self.modelCacheIds = [NSMutableDictionary dictionary];
         self.cacheQueue = dispatch_queue_create("com.in4mation.cacheQueue", DISPATCH_QUEUE_CONCURRENT);
+        self.persistCount = 0;
     }
     return self;
 }
@@ -84,15 +89,29 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
 #pragma mark - Object Addition, removal
 
 - (void)removeObjectFromCache:(BaseModelObject *)object {
+    __weak ModelManager *weak_self = self;
+    NSString *objectId = object.objectId;
+    Class objectClass = object.class;
+    
+    NSAssert(objectId != nil && objectId.length > 0, @"expected an objectId");
+    
     dispatch_barrier_async(self.cacheQueue, ^{
-        NSCache *cache = [self cacheForClass:object.class];
-        [cache removeObjectForKey:object.objectId];
-        [self removeObjectFromCache:object];
+        [[NSThread currentThread] isMainThread] ? NSLog(@"SHOULD BE DONE FROM BG THREAD") : nil;
+        NSCache *cache = [weak_self cacheForClass:objectClass];
+        [cache removeObjectForKey:objectId];
+        [weak_self removeObjectFromReferenceWithClass:objectClass andId:objectId];
     });
 }
 
 - (void)removeObjectFromReference:(BaseModelObject *)object {
-    [[self idSetForClass:object.class] removeObject:object.objectId];
+    [self removeObjectFromReferenceWithClass:object.class andId:object.objectId];
+}
+
+- (void)removeObjectFromReferenceWithClass:(Class)c andId:(NSString *)objectId {
+    if (objectId != nil) {
+        NSAssert(objectId != nil, @"expected objectId");
+        [[self idSetForClass:c] removeObject:objectId];
+    }
 }
 
 - (void)addObjectToCache:(BaseModelObject *)object {
@@ -120,6 +139,7 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
 
 - (void)cache:(NSCache *)cache willEvictObject:(BaseModelObject *)obj {
     dispatch_barrier_async(self.cacheQueue, ^{
+        [self persistObjectIfAppropriate:obj];
         [self removeObjectFromReference:obj];
     });
 }
@@ -146,7 +166,10 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
     // we grab it from disk synchronously on a high priority queue
     dispatch_sync(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
         NSString *path = [self pathForClass:class andObjectId:objectId];
-        bm = [BaseModelObject loadFromPath:path];
+        // see persistObjectIfAppropriate: method for further info on @synchronized usage here
+        @synchronized(path) {
+            bm = [BaseModelObject loadFromPath:path];
+        }
     });
 
     // we purposefully do not add the fetched object to the cache
@@ -169,13 +192,37 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
     return paths[0];
 }
 
+static NSString * const modelPathComponent = @"models";
+
 - (NSString *)pathForClassName:(NSString *)cName {
     NSAssert(cName.length > 0, @"cName.length must be > 0");
-    return [[self cacheDirectory] stringByAppendingPathComponent:cName];
+    return [[[self cacheDirectory] stringByAppendingPathComponent:modelPathComponent] stringByAppendingPathComponent:cName];
+}
+
+- (NSArray *)modelCacheDirectoriesOnDisk {
+    NSString *string = [[self cacheDirectory] stringByAppendingPathComponent:modelPathComponent];
+    NSURL *url = [NSURL fileURLWithPath:string];
+    return [[NSFileManager defaultManager] contentsOfDirectoryAtURL:url includingPropertiesForKeys:@[NSURLIsDirectoryKey] options:0 error:nil];
+}
+
+static NSString * const modelFileExtension = @".plist";
+
+- (void)diskCacheIds {
+    for (NSURL *modelPath in [self modelCacheDirectoriesOnDisk]) {
+        NSArray *files = [[NSFileManager defaultManager] contentsOfDirectoryAtURL:modelPath includingPropertiesForKeys:@[NSURLIsRegularFileKey] options:0 error:nil];
+        for (NSURL *file in files) {
+            NSRange extensionRange = [file.lastPathComponent rangeOfString:modelFileExtension];
+            if (extensionRange.location != NSNotFound) {
+                NSLog(@"modeltype: %@", modelPath.lastPathComponent);
+                NSLog(@"id: %@",[file.lastPathComponent substringToIndex:extensionRange.location]);
+                // add the id to a set
+            }
+        }
+    }
 }
 
 - (NSString *)pathForClass:(Class)class andObjectId:(NSString *)objectId {
-    return [NSString stringWithFormat:@"%@.plist", [[self pathForClassName:[self stringNameForClass:class]] stringByAppendingPathComponent:objectId]];
+    return [NSString stringWithFormat:@"%@%@", [[self pathForClassName:[self stringNameForClass:class]] stringByAppendingPathComponent:objectId], modelFileExtension];
 }
 
 - (NSString *)pathForObject:(BaseModelObject *)object {
@@ -183,7 +230,21 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
     return [self pathForClass:object.class andObjectId:object.objectId];
 }
 
+- (void)persistObjectIfAppropriate:(BaseModelObject *)bm {
+    if (bm != nil && [bm shouldPersistModelObject]) {
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0) , ^{
+            // we use the synchronized directive in order to lock based on the path
+            // this allows us to control read/write access across multiple threads
+            @synchronized([self pathForClass:bm.class andObjectId:bm.objectId]) {
+                [bm persistToPath:[self pathForObject:bm]];
+            }
+        });
+    }
+}
+
 - (void)persist {
+    ++self.persistCount;
+    
     dispatch_async(self.cacheQueue, ^{
         NSLog(@"cache names: %@", self.cacheNames);
         
@@ -200,16 +261,22 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
                 
                 for (NSString *objectId in classIdSet) {
                     BaseModelObject *m = [self _fetchObjectFromCacheWithClass:objectClass andId:objectId];
-                    if ([m shouldPersistModelObject]) {
-                        NSString *objectPath = [self pathForObject:m];
-                    
-                        // persist model
-                        [m persistToPath:objectPath];
-                    }
+                    [self persistObjectIfAppropriate:m];
                 }
             }
         }
+        [self persistCompleted];
     });
+}
+
+- (void)persistCompleted {
+    dispatch_barrier_async(self.cacheQueue, ^{
+        --self.persistCount;
+    });
+}
+
+- (BOOL)persistScheduled {
+    return self.persistCount > 0;
 }
 
 @end
