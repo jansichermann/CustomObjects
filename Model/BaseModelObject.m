@@ -68,12 +68,16 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     if (modelObject == nil && cached) {
         // we run into the issue of trying to fetch from disk every time
         modelObject = [[ModelManager shared] fetchObjectFromDiskWithClass:self andId:objectId];
-        [[ModelManager shared] addObjectToCache:modelObject];
     }
     
     if (modelObject == nil) {
         modelObject = [self newObjectWithId:objectId cached:cached];
     }
+    
+    if (modelObject != nil && cached) {
+        [[ModelManager shared] addObjectToCache:modelObject];
+    }
+    
     return modelObject;
 }
 
@@ -168,5 +172,7 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     }
     return nil;
 }
+
+
 
 @end
