@@ -47,14 +47,6 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     // which requires an objectId
     m.shouldCacheModel = cached ? ModelCachingAlways : ModelCachingNever;
     
-    
-    if (cached) {
-        [[ModelManager shared] addObjectToCache:m];
-    }
-    else {
-        [[ModelManager shared] removeObjectFromCache:m];
-    }
-    
     return m;
 }
 
