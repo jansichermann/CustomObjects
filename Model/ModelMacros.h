@@ -88,19 +88,18 @@ return _ ## _name; \
 #define MODEL_MULTI_RELATION_H_INTERFACE(_class, _name, _Name) \
 - (NSArray *)_name; \
 - (void)add ## _Name ## Object:(_class *)object; \
-- (void)remove ## _Name ## Object:(_class *)object;
+- (void)remove ## _Name ## Object:(_class *)object; \
+- (void)set ## _Name:(NSArray *)objects;
 
 #define MODEL_MULTI_RELATION_M_INTERFACE(_class, _name) \
-@property (nonatomic) NSMutableSet *_name ## Ids; \
+@property (nonatomic) NSMutableOrderedSet *_name ## Ids; \
 @property (nonatomic) NSMutableOrderedSet *_name ## OrderedMutableSet;
 
 #define MODEL_MULTI_RELATION_M_IMPLEMENTATION(_class, _name, _Name) \
 - (NSArray *)_name { \
     if (self._name ## Ids == nil || self._name ## Ids.count < 1) return nil; \
-    if (self._name ## OrderedMutableSet == nil ) { \
+    if (self._name ## OrderedMutableSet.count != self._name ## Ids.count || self._name ## OrderedMutableSet == nil) { \
         self._name ## OrderedMutableSet = [NSMutableOrderedSet orderedSet]; \
-    } \
-    if (self._name ## OrderedMutableSet.count != self._name ## Ids.count) { \
         for (NSString *objectId in self._name ## Ids) { \
             [self._name ## OrderedMutableSet addObject: [_class objectWithId:objectId] ]; \
         } \
@@ -109,12 +108,27 @@ return _ ## _name; \
 } \
 - (void)add ## _Name ## Object:(_class *)object { \
     if (self._name ## Ids == nil) { \
-        self._name ## Ids = [NSMutableSet set]; \
+        self._name ## Ids = [NSMutableOrderedSet set]; \
     } \
     [self._name ## Ids addObject:object.objectId]; \
+    [self._name ## OrderedMutableSet addObject: object]; \
 } \
 - (void)remove ## _Name ## Object:(_class *)object { \
     [self._name ## Ids removeObject:object.objectId]; \
+    [self._name ## OrderedMutableSet removeObject: object]; \
+} \
+- (void)set ## _Name:(NSArray *)objects { \
+    if (self._name ## Ids == nil) { \
+        self._name ## Ids = [NSMutableOrderedSet set]; \
+    } \
+    for (id<ObjectIdProtocol> object in objects) { \
+        if (![object conformsToProtocol:@protocol(ObjectIdProtocol)]) { \
+            NSAssert(NO, @"expected object to conform to <ObjectIdProtocol>"); \
+            continue; \
+        } \
+        [self._name ## Ids addObject:object.objectId]; \
+        [self._name ## OrderedMutableSet addObject:object]; \
+    } \
 }
 
 
