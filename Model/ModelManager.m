@@ -2,7 +2,7 @@
 //  ModelManager.m
 //
 //  Created by Jan Sichermann on 01/05/13.
-//  Copyright (c) 2013 online in4mation GmbH. All rights reserved.
+//  Copyright (c) 2013 Jan Sichermann. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -46,10 +46,9 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
 - (id)init {
     self = [super init];
     if (self) {
-        [self diskCacheIds];
         self.modelCache = [NSMutableDictionary dictionary];
         self.modelCacheIds = [NSMutableDictionary dictionary];
-        self.cacheQueue = dispatch_queue_create("com.in4mation.cacheQueue", DISPATCH_QUEUE_CONCURRENT);
+        self.cacheQueue = dispatch_queue_create("cacheQueue", DISPATCH_QUEUE_CONCURRENT);
         self.persistCount = 0;
     }
     return self;
@@ -177,7 +176,6 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
     // we purposefully do not add the fetched object to the cache
     // since objectWithId: will create a new object and set it in the cache
     // we do not want to override that one
-    // further, the mergeWithDiskModel: will handle merging these two objects
     
     return bm;
 }
@@ -208,20 +206,6 @@ static NSString * const modelPathComponent = @"models";
 }
 
 static NSString * const modelFileExtension = @".plist";
-
-- (void)diskCacheIds {
-    for (NSURL *modelPath in [self modelCacheDirectoriesOnDisk]) {
-        NSArray *files = [[NSFileManager defaultManager] contentsOfDirectoryAtURL:modelPath includingPropertiesForKeys:@[NSURLIsRegularFileKey] options:0 error:nil];
-        for (NSURL *file in files) {
-            NSRange extensionRange = [file.lastPathComponent rangeOfString:modelFileExtension];
-            if (extensionRange.location != NSNotFound) {
-                NSLog(@"modeltype: %@", modelPath.lastPathComponent);
-                NSLog(@"id: %@",[file.lastPathComponent substringToIndex:extensionRange.location]);
-                // add the id to a set
-            }
-        }
-    }
-}
 
 - (NSString *)pathForClass:(Class)class andObjectId:(NSString *)objectId {
     return [NSString stringWithFormat:@"%@%@", [[self pathForClassName:[self stringNameForClass:class]] stringByAppendingPathComponent:objectId], modelFileExtension];
@@ -279,6 +263,12 @@ static NSString * const modelFileExtension = @".plist";
 
 - (BOOL)persistScheduled {
     return self.persistCount > 0;
+}
+
+- (void)wipeDiskCache {
+    // we can just wipe the entire folder, as it will be recreated when needed
+    NSString *modelCachePath = [[self cacheDirectory] stringByAppendingPathComponent:modelPathComponent];
+    [[NSFileManager defaultManager] removeItemAtPath:modelCachePath error:nil];
 }
 
 @end
