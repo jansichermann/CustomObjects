@@ -46,12 +46,15 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
 - (id)init {
     self = [super init];
     if (self) {
-        self.modelCache = [NSMutableDictionary dictionary];
-        self.modelCacheIds = [NSMutableDictionary dictionary];
+        [self initializeCache];
         self.cacheQueue = dispatch_queue_create("cacheQueue", DISPATCH_QUEUE_CONCURRENT);
         self.persistCount = 0;
     }
     return self;
+}
+
+- (void)initializeCache {
+    [self clearCache];
 }
 
 
@@ -87,6 +90,11 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
 
 
 #pragma mark - Object Addition, removal
+
+- (void)clearCache {
+    self.modelCache = [NSMutableDictionary dictionary];
+    self.modelCacheIds = [NSMutableDictionary dictionary];
+}
 
 - (void)removeObjectFromCache:(BaseModelObject *)object {
     __weak ModelManager *weak_self = self;
@@ -232,8 +240,6 @@ static NSString * const modelFileExtension = @".plist";
     ++self.persistCount;
     
     dispatch_async(self.cacheQueue, ^{
-        NSLog(@"cache names: %@", self.cacheNames);
-        
         for (NSString *className in self.modelCacheIds.allKeys) {
             // create folder
             NSString *classPath = [self pathForClassName:className];

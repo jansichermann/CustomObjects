@@ -39,4 +39,10 @@ SHARED_SINGLETON_HEADER(ModelManager);
 - (NSArray *)cacheNames;
 - (void)persist;
 - (void)wipeDiskCache;
+
+
+// this should only be used for unit-testing and debug
+// clearing the cache does not have any
+// influence on pointers held to objects
+- (void)clearCache;
 @end
