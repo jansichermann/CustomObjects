@@ -1,5 +1,5 @@
 //
-//  ModelManagerTest.h
+//  BaseModelTest.h
 //
 //  Created by Jan Sichermann on 01/05/13.
 //  Copyright (c) 2013 Jan Sichermann. All rights reserved.
@@ -18,6 +18,6 @@
 
 #import <SenTestingKit/SenTestingKit.h>
 
-@interface ModelManagerTest : SenTestCase
+@interface BaseModelTest : SenTestCase
 
 @end

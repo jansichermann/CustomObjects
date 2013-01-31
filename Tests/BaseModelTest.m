@@ -1,5 +1,5 @@
 //
-//  ModelManagerTest.h
+//  BaseModelTest.m
 //
 //  Created by Jan Sichermann on 01/05/13.
 //  Copyright (c) 2013 Jan Sichermann. All rights reserved.
@@ -16,8 +16,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#import <SenTestingKit/SenTestingKit.h>
+#import "BaseModelTest.h"
+#import "BaseModelObject.h"
 
-@interface ModelManagerTest : SenTestCase
+@implementation BaseModelTest
+
+static NSString * const objectId = @"cvnxiuhwr98py7fgdkhl";
+
+- (void)setUp {
+    [super setUp];
+}
+
+- (void)tearDown {
+    
+    [super tearDown];
+}
+
+- (void)testModelSetup {
+    NSDictionary *d = @{
+    @"id" : objectId
+    };
+    STAssertNotNil([BaseModelObject withDictionary:d cached:YES], @"BaseModel setup failed");
+}
 
 @end
