@@ -18,6 +18,7 @@
 
 #import "BaseModelTest.h"
 #import "BaseModelObject.h"
+#import "ModelManager.h"
 
 @implementation BaseModelTest
 
@@ -33,10 +34,42 @@ static NSString * const objectId = @"cvnxiuhwr98py7fgdkhl";
 }
 
 - (void)testModelSetup {
-    NSDictionary *d = @{
+    STAssertNotNil([BaseModelObject withDictionary:[self objectDictionary] cached:YES], @"BaseModel setup failed");
+}
+
+- (NSDictionary *)objectDictionary {
+    return @{
     @"id" : objectId
     };
-    STAssertNotNil([BaseModelObject withDictionary:d cached:YES], @"BaseModel setup failed");
+}
+
+- (void)testCacheCollision {
+    BaseModelObject *objA = [BaseModelObject withDictionary:[self objectDictionary] cached:YES];
+    BaseModelObject *objB = [[ModelManager shared] fetchObjectFromCacheWithClass:[BaseModelObject class] andId:objectId];
+    STAssertEquals(objA, objB, @"expected objA pointer to equal objB pointer");
+    
+    BaseModelObject *objC = [BaseModelObject withDictionary:[self objectDictionary] cached:YES];
+    STAssertEquals(objA, objC, @"expected objA pointer to equal objC pointer");
+    
+    BaseModelObject *objD = [BaseModelObject objectWithId:objectId cached:YES];
+    STAssertEquals(objA, objD, @"expected objA pointer to equal objD pointer");
+    
+    BaseModelObject *objE = [BaseModelObject withDictionary:[self objectDictionary] cached:NO];
+    STAssertTrue(objA != objE, @"expected objA pointer to not equal objE pointer");
+    
+    BaseModelObject *objF = [BaseModelObject objectWithId:objectId cached:YES];
+    STAssertTrue(objA != objF, @"expected objA pointer to not equal objF pointer");
+}
+
+- (void)testCacheSetting {
+    BaseModelObject *objA = [BaseModelObject withDictionary:[self objectDictionary] cached:YES];
+    STAssertTrue([objA shouldCacheModel], @"expected model to be cached");
+    
+    BaseModelObject *objB = [BaseModelObject withDictionary:[self objectDictionary] cached:NO];
+    STAssertFalse([objB shouldCacheModel], @"expected model to not be cached");
+    
+    objB.shouldCacheModel = YES;
+    STAssertTrue([objB shouldCacheModel], @"expected model to be cached");
 }
 
 @end
