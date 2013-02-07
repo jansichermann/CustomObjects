@@ -2,7 +2,7 @@
 //  BaseModelObject.h
 //
 //  Created by Jan Sichermann on 01/05/13.
-//  Copyright (c) 2013 online in4mation GmbH. All rights reserved.
+//  Copyright (c) 2013 Jan Sichermann. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
+#define kBaseModelIdKey @"id"
 
 
 #import <Foundation/Foundation.h>
@@ -31,10 +33,6 @@ typedef enum {
 
 #pragma mark - BaseModel Protocols
 
-@protocol DateCreationProtocol <NSObject>
-- (NSDate *)createdAt;
-@end
-
 @protocol ObjectIdProtocol <NSObject>
 - (NSString *)objectId;
 @end
@@ -42,17 +40,17 @@ typedef enum {
 
 #pragma mark - BaseModel Interface
 
-@interface BaseModelObject : NSObject <DateCreationProtocol, ObjectIdProtocol>
+@interface BaseModelObject : NSObject <ObjectIdProtocol>
 
 @property (nonatomic) ModelCachingBehavior shouldCacheModel;
 
-MODEL_SINGLE_PROPERTY_H_INTERFACE(NSDate, createdAt);
 MODEL_SINGLE_PROPERTY_H_INTERFACE(NSString, objectId);
 
 
 
 #pragma mark - Initialization
 + (id)newObjectWithId:(NSString *)objectId;
++ (id)newObjectWithId:(NSString *)objectId cached:(BOOL)cached;
 + (id)objectWithId:(NSString *)objectId cached:(BOOL)cached;
 + (id)withDictionary:(NSDictionary *)dict cached:(BOOL)cached;
 
@@ -73,4 +71,7 @@ MODEL_SINGLE_PROPERTY_H_INTERFACE(NSString, objectId);
 - (void)persistToPath:(NSString *)path;
 + (id)loadFromPath:(NSString *)path;
 
+
+#pragma mark - Debugging and Testing
++ (NSMutableDictionary *)modelTestDictionary;
 @end

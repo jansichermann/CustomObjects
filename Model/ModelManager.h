@@ -19,6 +19,15 @@
 #import <Foundation/Foundation.h>
 #import "ModelMacros.h"
 
+
+
+
+// Exceptions
+extern NSException *modelObjectNoIdException;
+
+
+
+
 @class BaseModelObject;
 
 @interface ModelManager : NSObject <NSCacheDelegate>
@@ -35,7 +44,10 @@ SHARED_SINGLETON_HEADER(ModelManager);
 - (BaseModelObject *)fetchObjectFromCacheWithClass:(Class)class andId:(NSString *)objectId;
 - (BaseModelObject *)fetchObjectFromDiskWithClass:(Class)class andId:(NSString *)objectId;
 
+- (void)primeDiskModelIds;
+- (BOOL)hasDiskFileForObjectWithId:(NSString *)objectId andClass:(Class)objectClass;
 
++ (NSString *)cacheDirectory;
 - (NSArray *)cacheNames;
 - (void)persist;
 - (void)wipeDiskCache;

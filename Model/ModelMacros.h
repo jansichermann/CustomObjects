@@ -2,7 +2,7 @@
 //  ModelMacros.h
 //
 //  Created by Jan Sichermann on 01/05/13.
-//  Copyright (c) 2013 online in4mation GmbH. All rights reserved.
+//  Copyright (c) 2013 Jan Sichermann. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,15 +32,23 @@
 }
 
 
+#define WEAK(_obj) \
+__weak __typeof__(_obj) weak_ ## _obj = _obj
+
 
 //
 // MODEL
 //
 
 // variable setting
-#define SET_IF_NOT_NIL(_class, _var, _value) \
-if (_value != nil) { \
+#define SET_NONPRIMITIVE_IF_VAL_NOT_NIL(_class, _var, _value) \
+if ([_value isKindOfClass:_class]) { \
     _var = _value; \
+}
+
+#define ADD_TO_DICT_IF_MISSING(_dict, _key, _value) \
+if ([_dict objectForKey:_key] == nil && _value != nil) { \
+    [_dict setValue:_value forKey:_key]; \
 }
 
 // single property
@@ -54,6 +62,11 @@ if (_value != nil) { \
 #define MODEL_SINGLE_PROPERTY_INT_H_RW_INTERFACE(_name) \
 @property (nonatomic) int _name;
 
+#define MODEL_SINGLE_PROPERTY_FLOAT_H_RW_INTERFACE(_name) \
+@property (nonatomic) float _name;
+
+#define MODEL_SINGLE_PROPERTY_DOUBLE_H_RW_INTERFACE(_name) \
+@property (nonatomic) double _name;
 
 // single relation
 
@@ -77,6 +90,12 @@ if (_value != nil) { \
 if (self._name ## Id == nil || self._name ## Id.length < 1) return nil; \
 if (_ ## _name == nil) { \
     _ ## _name = (_class *)[[ModelManager shared] fetchObjectFromCacheWithClass:[_class class] andId:self._name ## Id]; \
+} \
+if (_ ## _name == nil && self._name ## Id != nil) { \
+    _ ## _name = (_class *)[[ModelManager shared] fetchObjectFromDiskWithClass:[_class class] andId:self._name ## Id]; \
+} \
+if (_ ## _name == nil && self._name ## Id != nil) { \
+    _ ## _name = (_class *)[self.class objectWithId:self._name ## Id cached:[self shouldCacheModelObject]]; \
 } \
 return _ ## _name; \
 }
@@ -123,7 +142,7 @@ return _ ## _name; \
     } \
     for (id<ObjectIdProtocol> object in objects) { \
         if (![object conformsToProtocol:@protocol(ObjectIdProtocol)]) { \
-            NSAssert(NO, @"expected object to conform to <ObjectIdProtocol>"); \
+[[NSException exceptionWithName:@"Object Conformity" reason:[NSString stringWithFormat:@"Expected object of type %@ to conform to <ObjectIdProtocol>", NSStringFromClass([object class])] userInfo:nil] raise]; \
             continue; \
         } \
         [self._name ## Ids addObject:object.objectId]; \

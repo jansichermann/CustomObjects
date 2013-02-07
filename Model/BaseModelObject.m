@@ -2,7 +2,7 @@
 //  BaseModelObject.m
 //
 //  Created by Jan Sichermann on 01/05/13.
-//  Copyright (c) 2013 online in4mation GmbH. All rights reserved.
+//  Copyright (c) 2013 Jan Sichermann. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@
 
 @interface BaseModelObject ()
 
-MODEL_SINGLE_PROPERTY_M_INTERFACE(NSDate, createdAt);
 MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 
 @end
@@ -36,10 +35,6 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 }
 
 + (id)newObjectWithId:(NSString *)objectId cached:(BOOL)cached {
-    if (objectId == nil || objectId.length < 1) {
-        [NSException raise:@"no id" format:@"object needs id to be created"];
-    }
-    
     BaseModelObject *m = [[self alloc] init];
     // the object id needs to be set before the caching behavior
     m.objectId = objectId;
@@ -51,30 +46,34 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 }
 
 + (id)objectWithId:(NSString *)objectId cached:(BOOL)cached {
+    if (objectId == nil || objectId.length == 0) {
+        [modelObjectNoIdException raise];
+    }
     BaseModelObject *modelObject = nil;
     
-    if (cached) {
-        modelObject = [[ModelManager shared] fetchObjectFromCacheWithClass:self.class andId:objectId];
-    }
-    
-    if (modelObject == nil && cached) {
-        // we run into the issue of trying to fetch from disk every time
-        modelObject = [[ModelManager shared] fetchObjectFromDiskWithClass:self andId:objectId];
-    }
-    
-    if (modelObject == nil) {
-        modelObject = [self newObjectWithId:objectId cached:cached];
-    }
-    
-    if (modelObject != nil && cached) {
-        [[ModelManager shared] addObjectToCache:modelObject];
+    if (objectId != nil && [objectId isKindOfClass:[NSString class]]) {
+        if (cached) {
+            modelObject = [[ModelManager shared] fetchObjectFromCacheWithClass:self.class andId:objectId];
+        }
+        
+        if (modelObject == nil && cached && [[ModelManager shared] hasDiskFileForObjectWithId:objectId andClass:self]) {
+            modelObject = [[ModelManager shared] fetchObjectFromDiskWithClass:self andId:objectId];
+        }
+        
+        if (modelObject == nil) {
+            modelObject = [self newObjectWithId:objectId cached:cached];
+        }
+        
+        if (modelObject != nil && cached) {
+            [[ModelManager shared] addObjectToCache:modelObject];
+        }
     }
     
     return modelObject;
 }
 
 + (id)withDictionary:(NSDictionary *)dict cached:(BOOL)cached {
-    id r = [self objectWithId:dict[@"id"] cached:cached];
+    id r = [self objectWithId:dict[kBaseModelIdKey] cached:cached];
     if (r && [r updateWithDictionary:dict]) {
         return r;
     }
@@ -84,10 +83,9 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 
 #pragma mark - Object updating
 - (BOOL)updateWithDictionary:(NSDictionary *)dict {
-    if (dict[@"id"]) {
-        SET_IF_NOT_NIL([NSString class], self.objectId, dict[@"id"]);
-        SET_IF_NOT_NIL([NSDate class], self.createdAt, [NSDate dateWithTimeIntervalSince1970:[dict[@"createdAt"] floatValue]]);
-
+    if (dict[kBaseModelIdKey]) {
+        SET_NONPRIMITIVE_IF_VAL_NOT_NIL([NSString class], self.objectId, dict[@"id"]);
+        
         if ([self shouldCacheModelObject]) {
             [[ModelManager shared] addObjectToCache:self];
         }
@@ -99,23 +97,25 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 
 #pragma mark - NSCoding
 - (void)encodeWithCoder:(NSCoder *)encoder {
-    [encoder encodeObject:self.objectId forKey:@"objectId"];
-    [encoder encodeObject:@([self.createdAt timeIntervalSince1970]) forKey:@"createdAt"];
+    [encoder encodeObject:self.objectId forKey:kBaseModelIdKey];
 }
 
 - (BaseModelObject *)initWithCoder:(NSCoder *)decoder {
-    // models from disk aren't cached as they would otherwise overwrite in-memory objects
-    // this should rather be handled with a merge
-    self = [self.class newObjectWithId:[decoder decodeObjectForKey:@"objectId"] cached:NO];
-    self.createdAt = [NSDate dateWithTimeIntervalSince1970:[[decoder decodeObjectForKey:@"createdAt"] intValue]];
+    // we set the caching behavior to yes,
+    // which overrides any object in cache
+    
+    // we do this, as we assume that any object fetched from disk
+    // is fetched from disk due to not being in cache
+    self = [self.class newObjectWithId:[decoder decodeObjectForKey:kBaseModelIdKey] cached:YES];
     return self;
 }
 
 
 #pragma mark - Caching behavior
 - (void)setShouldCacheModel:(ModelCachingBehavior)shouldCacheModel {
-
-    NSAssert(self.objectId != nil && self.objectId.length > 0, @"expected an objectId on the model");
+    if (self.objectId == nil || self.objectId.length == 0) {
+        [modelObjectNoIdException raise];
+    }
     
     _shouldCacheModel = shouldCacheModel;
     if (shouldCacheModel == ModelCachingAlways) {
@@ -127,7 +127,6 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 }
 
 - (BOOL)shouldCacheModelObject {
-    if (_shouldCacheModel == ModelCachingNever)         return NO;
     if (_shouldCacheModel == ModelCachingAlways)        return YES;
     return NO;
 }
@@ -139,14 +138,10 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 }
 
 - (void)persistToPath:(NSString *)path {
-    @try {
-        NSData *data = [NSKeyedArchiver archivedDataWithRootObject:self];
-        [data writeToFile:path atomically:NO];
-    }
-    @catch (NSException *exception) {
+
+    NSData *data = [NSKeyedArchiver archivedDataWithRootObject:self];
+    if ([data writeToFile:path atomically:NO]) {
         NSLog(@"### SOMETHING WENT WRONG TRYING TO PERSIST TO DISK ###");
-    }
-    @finally {
     }
 }
 
@@ -157,7 +152,10 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
             return obj;
         }
         @catch (NSException *exception) {
-            NSLog(@"### SOMETHING TERRIBLE HAPPENED WHEN LOADING FROM DISK ###");
+            NSLog(@"### FILE AT PATH DID NOT CONTAIN VALID ARCHIVE ###");
+#if UNITTESTING
+            [exception raise];
+#endif
         }
         @finally {
         }
@@ -166,5 +164,12 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 }
 
 
+#pragma mark - Debugging and Testing
+
++ (NSMutableDictionary *)modelTestDictionary {
+    NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
+    dictionary[kBaseModelIdKey] = @"KHJZXV8YQ345HKJLXCVBNMER89Y";
+    return dictionary;
+}
 
 @end

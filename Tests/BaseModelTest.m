@@ -22,54 +22,48 @@
 
 @implementation BaseModelTest
 
-static NSString * const objectId = @"cvnxiuhwr98py7fgdkhl";
-
-- (void)setUp {
-    [super setUp];
-}
-
-- (void)tearDown {
-    
-    [super tearDown];
-}
-
 - (void)testModelSetup {
-    STAssertNotNil([BaseModelObject withDictionary:[self objectDictionary] cached:YES], @"BaseModel setup failed");
-}
-
-- (NSDictionary *)objectDictionary {
-    return @{
-    @"id" : objectId
-    };
+    STAssertNotNil([BaseModelObject withDictionary:[BaseModelObject modelTestDictionary] cached:YES], @"BaseModel setup failed");
 }
 
 - (void)testCacheCollision {
-    BaseModelObject *objA = [BaseModelObject withDictionary:[self objectDictionary] cached:YES];
-    BaseModelObject *objB = [[ModelManager shared] fetchObjectFromCacheWithClass:[BaseModelObject class] andId:objectId];
+    NSDictionary *d = [BaseModelObject modelTestDictionary];
+    BaseModelObject *objA = [BaseModelObject withDictionary:d cached:YES];
+    BaseModelObject *objB = [[ModelManager shared] fetchObjectFromCacheWithClass:[BaseModelObject class] andId:d[kBaseModelIdKey]];
     STAssertEquals(objA, objB, @"expected objA pointer to equal objB pointer");
     
-    BaseModelObject *objC = [BaseModelObject withDictionary:[self objectDictionary] cached:YES];
+    BaseModelObject *objC = [BaseModelObject withDictionary:d cached:YES];
     STAssertEquals(objA, objC, @"expected objA pointer to equal objC pointer");
     
-    BaseModelObject *objD = [BaseModelObject objectWithId:objectId cached:YES];
+    BaseModelObject *objD = [BaseModelObject objectWithId:d[kBaseModelIdKey] cached:YES];
     STAssertEquals(objA, objD, @"expected objA pointer to equal objD pointer");
     
-    BaseModelObject *objE = [BaseModelObject withDictionary:[self objectDictionary] cached:NO];
+    BaseModelObject *objE = [BaseModelObject withDictionary:d cached:NO];
     STAssertTrue(objA != objE, @"expected objA pointer to not equal objE pointer");
     
-    BaseModelObject *objF = [BaseModelObject objectWithId:objectId cached:YES];
+    BaseModelObject *objF = [BaseModelObject objectWithId:d[kBaseModelIdKey] cached:YES];
     STAssertTrue(objA != objF, @"expected objA pointer to not equal objF pointer");
 }
 
 - (void)testCacheSetting {
-    BaseModelObject *objA = [BaseModelObject withDictionary:[self objectDictionary] cached:YES];
+    NSDictionary *d = [BaseModelObject modelTestDictionary];
+    BaseModelObject *objA = [BaseModelObject withDictionary:d cached:YES];
     STAssertTrue([objA shouldCacheModel], @"expected model to be cached");
     
-    BaseModelObject *objB = [BaseModelObject withDictionary:[self objectDictionary] cached:NO];
+    BaseModelObject *objB = [BaseModelObject withDictionary:d cached:NO];
     STAssertFalse([objB shouldCacheModel], @"expected model to not be cached");
     
-    objB.shouldCacheModel = YES;
+    STAssertNoThrow([objB setShouldCacheModel: ModelCachingAlways], @"expected to be able to set caching behavior");
     STAssertTrue([objB shouldCacheModel], @"expected model to be cached");
 }
+
+- (void)testExceptions {
+    STAssertThrows([BaseModelObject objectWithId:nil cached:YES], @"expected an exception on nil id object");
+}
+
+- (void)testNewObject {
+    STAssertNoThrow([BaseModelObject newObjectWithId:[BaseModelObject modelTestDictionary][kBaseModelIdKey]], @"expected no exception on newObjectWithId:");
+}
+
 
 @end

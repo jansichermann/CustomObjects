@@ -28,6 +28,7 @@ static const NSUInteger DEFAULT_CACHE_LIMIT = 0;
 
 @property (nonatomic)   NSMutableDictionary *modelCache;
 @property               NSMutableDictionary *modelCacheIds;     // since we cannot iterate over the NSCache in modelCache, we have to keep a reference to all possible ids
+@property (nonatomic)   NSMutableDictionary *diskCacheIds;      // this is informational so we don't hit the disk if an object is obviously not there. 
 
 
 // we have a single concurrent queue
@@ -39,9 +40,14 @@ static const NSUInteger DEFAULT_CACHE_LIMIT = 0;
 @end
 
 
+// Exception
+NSException *modelObjectNoIdException;
+
 @implementation ModelManager
 
 SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
+
+
 
 - (id)init {
     self = [super init];
@@ -49,6 +55,7 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
         [self initializeCache];
         self.cacheQueue = dispatch_queue_create("cacheQueue", DISPATCH_QUEUE_CONCURRENT);
         self.persistCount = 0;
+        modelObjectNoIdException = [NSException exceptionWithName:@"No Id" reason:@"Expected an objectId" userInfo:nil];
     }
     return self;
 }
@@ -66,25 +73,29 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
 }
 
 - (NSString *)stringNameForClass:(Class)class {
-    NSAssert(class != nil, @"expected class");
-    return NSStringFromClass(class);
+    NSAssert(class != nil, @"Expected class");
+    return class != nil ? NSStringFromClass(class) : nil;
 }
 
 - (NSCache *)createCacheForClass:(Class)class {
-    NSAssert(class != nil, @"expected class");
-    // create an appropriate id mapping
-    NSMutableSet *idSet = [NSMutableSet set];
-    self.modelCacheIds[[self stringNameForClass:class]] = idSet;
-    
-    // create actual cache
-    NSCache *cache = [[NSCache alloc] init];
-    self.modelCache[[self stringNameForClass:class]] = cache;
-    cache.totalCostLimit = DEFAULT_CACHE_LIMIT;
-    return cache;
+    NSAssert(class != nil, @"Expected class");
+    if (class != nil) {
+        // create an appropriate id mapping
+        NSMutableSet *idSet = [NSMutableSet set];
+        self.modelCacheIds[[self stringNameForClass:class]] = idSet;
+        
+        // create actual cache
+        NSCache *cache = [[NSCache alloc] init];
+        self.modelCache[[self stringNameForClass:class]] = cache;
+        cache.totalCostLimit = DEFAULT_CACHE_LIMIT;
+        return cache;
+    }
+    return nil;
 }
 
 - (NSMutableSet *)idSetForClass:(Class)class {
-    return self.modelCacheIds[[self stringNameForClass:class]];
+    NSAssert(class != nil, @"Expected class");
+    return class != nil ? self.modelCacheIds[[self stringNameForClass:class]] : nil;
 }
 
 
@@ -96,51 +107,67 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
     self.modelCacheIds = [NSMutableDictionary dictionary];
 }
 
-- (void)removeObjectFromCache:(BaseModelObject *)object {
-    __weak ModelManager *weak_self = self;
-    NSString *objectId = object.objectId;
-    Class objectClass = object.class;
-    
-    NSAssert(objectId != nil && objectId.length > 0, @"expected an objectId");
-    
-    dispatch_barrier_async(self.cacheQueue, ^{
-        [[NSThread currentThread] isMainThread] ? NSLog(@"SHOULD BE DONE FROM BG THREAD") : nil;
-        NSCache *cache = [weak_self cacheForClass:objectClass];
-        [cache removeObjectForKey:objectId];
-        [weak_self removeObjectFromReferenceWithClass:objectClass andId:objectId];
-    });
+- (void)_removeObjectFromCache:(BaseModelObject *)object {
+    [[NSThread currentThread] isMainThread] ? NSLog(@"SHOULD BE DONE FROM BG THREAD") : nil;
+    NSCache *cache = [self cacheForClass:object.class];
+    [cache removeObjectForKey:object.objectId];
+    [self removeObjectFromReferenceWithClass:object.class andId:object.objectId];
 }
+
+- (void)removeObjectFromCache:(BaseModelObject *)object {
+    
+    NSAssert(object.objectId.length > 0, @"Expected object to have a valid objectId");
+    
+    if (object.objectId.length > 0) {        
+        dispatch_barrier_async(self.cacheQueue, ^{
+            [self _removeObjectFromCache:object];
+        });
+    }
+}
+
+
+// Reference is the set of ids kept in order to be able to iterate
+// through all objects in cache
 
 - (void)removeObjectFromReference:(BaseModelObject *)object {
     [self removeObjectFromReferenceWithClass:object.class andId:object.objectId];
 }
 
-- (void)removeObjectFromReferenceWithClass:(Class)c andId:(NSString *)objectId {
-    if (objectId != nil) {
-        NSAssert(objectId != nil, @"expected objectId");
-        [[self idSetForClass:c] removeObject:objectId];
+- (void)removeObjectFromReferenceWithClass:(Class)class andId:(NSString *)objectId {
+    NSAssert(objectId != nil, @"Expected an objectId");
+    NSAssert(class != nil, @"Expected a class");
+    
+    if (objectId != nil && class != nil) {
+        [[self idSetForClass:class] removeObject:objectId];
     }
+}
+
+- (void)_addObjectToCache:(BaseModelObject *)object {
+    [[NSThread currentThread] isMainThread] ? NSLog(@"SHOULD BE DONE FROM BG THREAD") : nil;
+    
+    NSCache *cache = [self cacheForClass:object.class];
+    
+    if (cache == nil) {
+        cache = [self createCacheForClass:object.class];
+    }
+    
+    [cache setObject:object forKey:object.objectId];
+    
+    [[self idSetForClass:object.class] addObject:object.objectId];
 }
 
 - (void)addObjectToCache:(BaseModelObject *)object {
     // dispatch_barrier waits for all currently executing blocks on the
     // queue to finish, then locks the queue, executes, and unlocks the queue.
     // during the execution of the barrier block, no other blocks run
-    NSAssert(object != nil, @"expected object to not be nil");
-    dispatch_barrier_async(self.cacheQueue, ^{
-        [[NSThread currentThread] isMainThread] ? NSLog(@"SHOULD BE DONE FROM BG THREAD") : nil;
-        
-        NSCache *cache = [self cacheForClass:object.class];
-        
-        if (cache == nil) {
-            cache = [self createCacheForClass:object.class];
-        }
-        
-        [cache setObject:object forKey:object.objectId];
-        
-        [[self idSetForClass:object.class] addObject:object.objectId];
-    });
-
+    if (object != nil && object.objectId != nil) {
+        dispatch_barrier_async(self.cacheQueue, ^{
+            [self _addObjectToCache:object];
+        });
+    }
+    else {
+        [modelObjectNoIdException raise];
+    }
 }
 
 
@@ -193,9 +220,47 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
 }
 
 
+- (void)addObjectToDiskCacheIdSetWithObjectId:(NSString *)objectId andClassName:(NSString *)className {
+    if (self.diskCacheIds == nil) {
+        self.diskCacheIds = [NSMutableDictionary dictionary];
+    }
+    if ([self.diskCacheIds objectForKey:className] == nil) {
+        self.diskCacheIds[className] = [NSMutableSet set];
+    }
+    [self.diskCacheIds[className] addObject:objectId];
+}
+
+- (void)primeDiskModelIds {
+    NSArray *modelCacheDirs = [self modelCacheDirectoriesOnDisk];
+    
+    for (NSURL *classPathDir in modelCacheDirs) {
+        NSArray *cachedObjectFiles = [[NSFileManager defaultManager] contentsOfDirectoryAtURL:classPathDir includingPropertiesForKeys:@[NSURLIsRegularFileKey] options:0 error:nil];
+        
+        for (NSURL *cachedObjectFilePath in cachedObjectFiles) {
+            NSArray *pathComponents = cachedObjectFilePath.pathComponents;
+            
+            if (pathComponents.count > 1) {
+                NSString *fileName = [pathComponents objectAtIndex:pathComponents.count -1];
+                NSString *modelClassName = [pathComponents objectAtIndex:pathComponents.count -2];
+                
+                NSRange plistRange = [fileName rangeOfString:modelFileExtension];
+                if (plistRange.location != NSNotFound) {
+                    NSString *objectId = [fileName substringToIndex:plistRange.location];
+                    [self addObjectToDiskCacheIdSetWithObjectId:objectId andClassName:modelClassName];
+                }
+            }
+        }
+    }
+}
+
+- (BOOL)hasDiskFileForObjectWithId:(NSString *)objectId andClass:(Class)objectClass {
+    BOOL contains = [self.diskCacheIds[[self stringNameForClass:objectClass]] containsObject:objectId];
+    return contains;
+}
+
 #pragma mark - Persisting
 
-- (NSString *)cacheDirectory {
++ (NSString *)cacheDirectory {
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
     return paths[0];
 }
@@ -204,24 +269,39 @@ static NSString * const modelPathComponent = @"models";
 
 - (NSString *)pathForClassName:(NSString *)cName {
     NSAssert(cName.length > 0, @"cName.length must be > 0");
-    return [[[self cacheDirectory] stringByAppendingPathComponent:modelPathComponent] stringByAppendingPathComponent:cName];
+    return [[[self.class cacheDirectory] stringByAppendingPathComponent:modelPathComponent] stringByAppendingPathComponent:cName];
 }
 
 - (NSArray *)modelCacheDirectoriesOnDisk {
-    NSString *string = [[self cacheDirectory] stringByAppendingPathComponent:modelPathComponent];
+    NSString *string = [[self.class cacheDirectory] stringByAppendingPathComponent:modelPathComponent];
     NSURL *url = [NSURL fileURLWithPath:string];
-    return [[NSFileManager defaultManager] contentsOfDirectoryAtURL:url includingPropertiesForKeys:@[NSURLIsDirectoryKey] options:0 error:nil];
+
+    NSError *err = nil;
+    NSArray *dirs = [[NSFileManager defaultManager] contentsOfDirectoryAtURL:url includingPropertiesForKeys:@[NSURLIsDirectoryKey] options:0 error:&err];
+    if (err) {
+        NSLog(@"Couldn't read modelCacheDirectories on Disk: %@", err);
+        return nil;
+    }
+    
+    return dirs;
 }
 
 static NSString * const modelFileExtension = @".plist";
 
 - (NSString *)pathForClass:(Class)class andObjectId:(NSString *)objectId {
-    return [NSString stringWithFormat:@"%@%@", [[self pathForClassName:[self stringNameForClass:class]] stringByAppendingPathComponent:objectId], modelFileExtension];
+    NSAssert(objectId.length > 0, @"Expected objectId");
+    if (objectId.length > 0) {
+        return [NSString stringWithFormat:@"%@%@", [[self pathForClassName:[self stringNameForClass:class]] stringByAppendingPathComponent:objectId], modelFileExtension];
+    }
+    return nil;
 }
 
 - (NSString *)pathForObject:(BaseModelObject *)object {
-    NSAssert(object != nil, @"object cannot be nil");
-    return [self pathForClass:object.class andObjectId:object.objectId];
+    NSAssert(object != nil, @"Expected Object");
+    if (object != nil) {
+        return [self pathForClass:object.class andObjectId:object.objectId];
+    }
+    return nil;
 }
 
 - (void)persistObjectIfAppropriate:(BaseModelObject *)bm {
@@ -230,6 +310,7 @@ static NSString * const modelFileExtension = @".plist";
             // we use the synchronized directive in order to lock based on the path
             // this allows us to control read/write access across multiple threads
             @synchronized([self pathForClass:bm.class andObjectId:bm.objectId]) {
+                [self addObjectToDiskCacheIdSetWithObjectId:bm.objectId andClassName:[self stringNameForClass:bm.class]];
                 [bm persistToPath:[self pathForObject:bm]];
             }
         });
@@ -273,7 +354,7 @@ static NSString * const modelFileExtension = @".plist";
 
 - (void)wipeDiskCache {
     // we can just wipe the entire folder, as it will be recreated when needed
-    NSString *modelCachePath = [[self cacheDirectory] stringByAppendingPathComponent:modelPathComponent];
+    NSString *modelCachePath = [[self.class cacheDirectory] stringByAppendingPathComponent:modelPathComponent];
     [[NSFileManager defaultManager] removeItemAtPath:modelCachePath error:nil];
 }
 
