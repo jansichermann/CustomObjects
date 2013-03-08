@@ -19,6 +19,8 @@
 #import "BaseModelObject.h"
 #import "ModelManager.h"
 
+
+
 @interface BaseModelObject ()
 
 MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
@@ -26,23 +28,29 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 @end
 
 
+
 @implementation BaseModelObject
 
 
+
 #pragma mark - Initialization
+
 + (id)newObjectWithId:(NSString *)objectId {
     return [self newObjectWithId:objectId cached:NO];
 }
 
 + (id)newObjectWithId:(NSString *)objectId cached:(BOOL)cached {
-    BaseModelObject *m = [[self alloc] init];
-    // the object id needs to be set before the caching behavior
-    m.objectId = objectId;
-    // as setShouldCacheModel will remove or add the object from or to the cache
-    // which requires an objectId
-    m.shouldCacheModel = cached ? ModelCachingAlways : ModelCachingNever;
-    
-    return m;
+    if (objectId.length > 0) {
+        BaseModelObject *m = [[self alloc] init];
+        // the object id needs to be set before the caching behavior
+        m.objectId = objectId;
+        // as setShouldCacheModel will remove or add the object from or to the cache
+        // which requires an objectId
+        m.shouldCacheModel = cached ? ModelCachingAlways : ModelCachingNever;
+        
+        return m;
+    }
+    return nil;
 }
 
 + (id)objectWithId:(NSString *)objectId cached:(BOOL)cached {
@@ -51,7 +59,7 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     }
     BaseModelObject *modelObject = nil;
     
-    if (objectId != nil && [objectId isKindOfClass:[NSString class]]) {
+    if (objectId && [objectId isKindOfClass:[NSString class]]) {
         if (cached) {
             modelObject = [[ModelManager shared] fetchObjectFromCacheWithClass:self.class andId:objectId];
         }
@@ -64,7 +72,7 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
             modelObject = [self newObjectWithId:objectId cached:cached];
         }
         
-        if (modelObject != nil && cached) {
+        if (modelObject && cached) {
             [[ModelManager shared] addObjectToCache:modelObject];
         }
     }
@@ -84,7 +92,7 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 #pragma mark - Object updating
 - (BOOL)updateWithDictionary:(NSDictionary *)dict {
     if (dict[kBaseModelIdKey]) {
-        SET_NONPRIMITIVE_IF_VAL_NOT_NIL([NSString class], self.objectId, dict[@"id"]);
+        SET_NONPRIMITIVE_IF_VAL_NOT_NIL([NSString class], self.objectId, dict[kBaseModelIdKey]);
         
         if ([self shouldCacheModelObject]) {
             [[ModelManager shared] addObjectToCache:self];
@@ -140,7 +148,8 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 - (void)persistToPath:(NSString *)path {
 
     NSData *data = [NSKeyedArchiver archivedDataWithRootObject:self];
-    if ([data writeToFile:path atomically:NO]) {
+    if (![data writeToFile:path atomically:YES]) {
+        NSAssert(NO, @"persist failed");
         NSLog(@"### SOMETHING WENT WRONG TRYING TO PERSIST TO DISK ###");
     }
 }

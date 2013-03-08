@@ -17,7 +17,7 @@
 // limitations under the License.
 
 
-#define kBaseModelIdKey @"id"
+#define kBaseModelIdKey @"_id"
 
 
 #import <Foundation/Foundation.h>

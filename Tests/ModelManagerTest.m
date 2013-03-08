@@ -118,10 +118,6 @@
     STAssertFalse([set containsObject:[BaseModelObject modelTestDictionary][kBaseModelIdKey]], @"expected id of object to be in reference set");
 }
 
-- (void)testAddObjectToCacheNoId {
-    STAssertThrows([[ModelManager shared] addObjectToCache:nil], @"expected exception because of no id");
-}
-
 - (void)testAddObjectToDiskCacheIdSetWithObjectId {
     STAssertNoThrow([[ModelManager shared] addObjectToDiskCacheIdSetWithObjectId:[BaseModelObject modelTestDictionary][kBaseModelIdKey] andClassName:[[ModelManager shared] stringNameForClass:[BaseModelObject class]]], @"expected to be able to add objectId to diskIdSet");
     STAssertTrue( [[[[ModelManager shared] diskCacheIds] objectForKey:[[ModelManager shared] stringNameForClass:[BaseModelObject class]]] containsObject:[BaseModelObject modelTestDictionary][kBaseModelIdKey]], @"expected diskIds to contain objectId");
