@@ -20,22 +20,18 @@
 #import "BaseModelObject.h"
 
 
+
 static const NSUInteger DEFAULT_CACHE_LIMIT = 0;
+
+
 
 @interface ModelManager ()
 
-@property int persistCount;
+@property               int                 persistCount;
 
 @property (nonatomic)   NSMutableDictionary *modelCache;
 @property               NSMutableDictionary *modelCacheIds;     // since we cannot iterate over the NSCache in modelCache, we have to keep a reference to all possible ids
 @property (nonatomic)   NSMutableDictionary *diskCacheIds;      // this is informational so we don't hit the disk if an object is obviously not there.
-
-
-// we have a single concurrent queue
-// reading from the cache can be done concurrently w/ sync
-// altering the cache (i.e. adding/removing objects) is done with a barrier
-// to insure thread-safety.
-@property               dispatch_queue_t cacheQueue;
 
 @end
 
@@ -47,13 +43,10 @@ NSException *modelObjectNoIdException;
 
 SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
 
-
-
 - (id)init {
     self = [super init];
     if (self) {
         [self initializeCache];
-        self.cacheQueue = dispatch_queue_create("cacheQueue", DISPATCH_QUEUE_CONCURRENT);
         self.persistCount = 0;
         modelObjectNoIdException = [NSException exceptionWithName:@"No Id" reason:@"Expected an objectId" userInfo:nil];
     }
@@ -63,8 +56,6 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
 - (void)initializeCache {
     [self clearCache];
 }
-
-
 
 #pragma mark - Cache creation
 
@@ -305,11 +296,13 @@ static NSString * const modelFileExtension = @".plist";
         
         if (!error) {
             Class objectClass = NSClassFromString(className);
-            NSMutableSet *classIdSet = [self idSetForClass:objectClass];
-            
+            NSSet *classIdSet = [[self idSetForClass:objectClass] copy];
+
             for (NSString *objectId in classIdSet) {
                 BaseModelObject *m = [self _fetchObjectFromCacheWithClass:objectClass andId:objectId];
-                [self persistObjectIfAppropriate:m];
+                if (m) {
+                    [self persistObjectIfAppropriate:m];
+                }
             }
         }
     }
