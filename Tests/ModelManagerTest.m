@@ -81,7 +81,7 @@
 }
 
 - (void)testCacheCreation {
-    STAssertNil([[ModelManager shared] createCacheForClass:nil], @"expected nil class to return nil");
+    STAssertThrows([[ModelManager shared] createCacheForClass:nil], @"expected nil class to return nil");
     NSCache *cache = [[ModelManager shared] createCacheForClass:[BaseModelObject class]];
     STAssertNotNil(cache, @"expected a cache back");
     STAssertEqualObjects(cache.class, [NSCache class], @"expected the returned object to be of type NSCache");
@@ -103,7 +103,7 @@
 }
 
 - (void)testIdSetForClass {
-    STAssertNil([[ModelManager shared] idSetForClass:nil], @"expected nil object");
+    STAssertThrows([[ModelManager shared] idSetForClass:nil], @"expected nil object");
     [[ModelManager shared] createCacheForClass:[BaseModelObject class]];
     STAssertNotNil([[ModelManager shared] idSetForClass:[BaseModelObject class]], @"expected valid reference set for class");
 }
@@ -124,8 +124,8 @@
 }
 
 - (void)testPathForObject {
-    STAssertNil([[ModelManager shared] pathForClass:nil andObjectId:nil], @"expected nil return for nil objectId");
-    STAssertNil([[ModelManager shared] pathForObject:nil], @"expected nil return for nil object");
+    STAssertThrows([[ModelManager shared] pathForClass:nil andObjectId:nil], @"expected nil return for nil objectId");
+    STAssertThrows([[ModelManager shared] pathForObject:nil], @"expected nil return for nil object");
     STAssertEqualObjects([[ModelManager shared] pathForObject:[BaseModelObject withDictionary:[BaseModelObject modelTestDictionary] cached:YES]],
                    [[ModelManager shared] pathForClass:[BaseModelObject class] andObjectId:[BaseModelObject modelTestDictionary][kBaseModelIdKey]],
                    @"expected paths to equal");

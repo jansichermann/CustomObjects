@@ -65,5 +65,30 @@
     STAssertNoThrow([BaseModelObject newObjectWithId:[BaseModelObject modelTestDictionary][kBaseModelIdKey]], @"expected no exception on newObjectWithId:");
 }
 
+- (void)testNilObjectId {
+    STAssertNil([BaseModelObject newObjectWithId:nil], @"Expected Nil Object to be returned");
+}
+
+- (void)testNilObjectIdException {
+    STAssertThrows([BaseModelObject objectWithId:nil cached:YES], @"Expected modelObjectNoIdException");
+}
+
+- (void)testUpdateWithDictionaryNil {
+    BaseModelObject *bm = [[BaseModelObject alloc] init];
+    STAssertFalse([bm updateWithDictionary:@{}], @"Expected to return NO");
+}
+
+- (void)testSetShouldCacheWithoutId {
+    BaseModelObject *bm = [[BaseModelObject alloc] init];
+    STAssertThrows([bm setShouldCacheModel:ModelCachingAlways], @"Expected to throw on no id");
+}
+
+- (void)testShouldPersistModel {
+    NSDictionary *d = [BaseModelObject modelTestDictionary];
+    BaseModelObject *bm = [BaseModelObject withDictionary:d cached:YES];
+    STAssertTrue([bm shouldPersistModelObject], @"Expected model to be persistable");
+    bm.shouldCacheModel = ModelCachingNever;
+    STAssertFalse([bm shouldPersistModelObject], @"Expected model to not be persistable");
+}
 
 @end
