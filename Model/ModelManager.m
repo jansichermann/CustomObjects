@@ -95,7 +95,6 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
     // create actual cache
     NSCache *cache = [[NSCache alloc] init];
     NSAssert(cache, @"Expected cache");
-    NSAssert(self.modelCache, @"Expected modelCache");
     
     
     // the following would allow us to use modelcache in threads different than the main one
@@ -110,6 +109,8 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
     else {
         self.modelCache = @{cacheKey: cache};
     }
+    
+    NSAssert(self.modelCache, @"Expected modelCache");
     
     cache.totalCostLimit = DEFAULT_CACHE_LIMIT;
     return cache;
