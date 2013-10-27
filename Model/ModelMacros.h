@@ -122,14 +122,14 @@ return _ ## _name; \
     if (self._name ## OrderedMutableSet.count != self._name ## Ids.count || self._name ## OrderedMutableSet == nil) { \
         self._name ## OrderedMutableSet = [NSMutableOrderedSet orderedSet]; \
         for (NSString *objectId in self._name ## Ids) { \
-            [self._name ## OrderedMutableSet addObject: [_class objectWithId:objectId] ]; \
+            [self._name ## OrderedMutableSet addObject: [_class objectWithId:objectId cached:[self shouldCacheModelObject]] ]; \
         } \
     } \
     return self._name ## OrderedMutableSet.array; \
 } \
 - (void)add ## _Name ## Object:(_class *)object { \
     if (self._name ## Ids == nil) { \
-        self._name ## Ids = [NSMutableOrderedSet set]; \
+        self._name ## Ids = [NSMutableOrderedSet orderedSet]; \
     } \
     [self._name ## Ids addObject:object.objectId]; \
     [self._name ## OrderedMutableSet addObject: object]; \
@@ -140,7 +140,7 @@ return _ ## _name; \
 } \
 - (void)set ## _Name:(NSArray *)objects { \
     if (self._name ## Ids == nil) { \
-        self._name ## Ids = [NSMutableOrderedSet set]; \
+        self._name ## Ids = [NSMutableOrderedSet orderedSet]; \
     } \
     for (id<ObjectIdProtocol> object in objects) { \
         if (![object conformsToProtocol:@protocol(ObjectIdProtocol)]) { \
