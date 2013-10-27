@@ -17,9 +17,6 @@
 // limitations under the License.
 
 
-#define kBaseModelIdKey @"_id"
-
-
 #import <Foundation/Foundation.h>
 #import "ModelMacros.h"
 
@@ -57,7 +54,7 @@ MODEL_SINGLE_PROPERTY_H_INTERFACE(NSString, objectId);
 
 #pragma mark - Object updating
 - (BOOL)updateWithDictionary:(NSDictionary *)dict;
-
++ (NSString *)objectIdFieldName;
 
 #pragma mark - NSCoding
 - (void)encodeWithCoder:(NSCoder *)encoder;

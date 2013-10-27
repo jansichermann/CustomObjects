@@ -61,7 +61,7 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     
     if (objectId && [objectId isKindOfClass:[NSString class]]) {
         if (cached) {
-            modelObject = [[ModelManager shared] fetchObjectFromCacheWithClass:self.class andId:objectId];
+            modelObject = [[ModelManager shared] fetchObjectFromCacheWithClass:self andId:objectId];
         }
         
         if (modelObject == nil && cached && [[ModelManager shared] hasDiskFileForObjectWithId:objectId andClass:self]) {
@@ -81,7 +81,7 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 }
 
 + (id)withDictionary:(NSDictionary *)dict cached:(BOOL)cached {
-    id r = [self objectWithId:dict[kBaseModelIdKey] cached:cached];
+    id r = [self objectWithId:dict[self.objectIdFieldName] cached:cached];
     if (r && [r updateWithDictionary:dict]) {
         return r;
     }
@@ -91,8 +91,8 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 
 #pragma mark - Object updating
 - (BOOL)updateWithDictionary:(NSDictionary *)dict {
-    if (dict[kBaseModelIdKey]) {
-        SET_NONPRIMITIVE_IF_VAL_NOT_NIL([NSString class], self.objectId, dict[kBaseModelIdKey]);
+    if (dict[self.class.objectIdFieldName]) {
+        SET_NONPRIMITIVE_IF_VAL_NOT_NIL([NSString class], self.objectId, dict[self.class.objectIdFieldName]);
         
         if ([self shouldCacheModelObject]) {
             [[ModelManager shared] addObjectToCache:self];
@@ -102,10 +102,14 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     return NO;
 }
 
++ (NSString *)objectIdFieldName {
+    return @"_id";
+}
+
 
 #pragma mark - NSCoding
 - (void)encodeWithCoder:(NSCoder *)encoder {
-    [encoder encodeObject:self.objectId forKey:kBaseModelIdKey];
+    [encoder encodeObject:self.objectId forKey:self.class.objectIdFieldName];
 }
 
 - (BaseModelObject *)initWithCoder:(NSCoder *)decoder {
@@ -114,7 +118,7 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     
     // we do this, as we assume that any object fetched from disk
     // is fetched from disk due to not being in cache
-    self = [self.class newObjectWithId:[decoder decodeObjectForKey:kBaseModelIdKey] cached:YES];
+    self = [self.class newObjectWithId:[decoder decodeObjectForKey:self.class.objectIdFieldName] cached:YES];
     return self;
 }
 
@@ -177,7 +181,7 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 
 + (NSMutableDictionary *)modelTestDictionary {
     NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
-    dictionary[kBaseModelIdKey] = @"KHJZXV8YQ345HKJLXCVBNMER89Y";
+    dictionary[self.objectIdFieldName] = @"KHJZXV8YQ345HKJLXCVBNMER89Y";
     return dictionary;
 }
 
