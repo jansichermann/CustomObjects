@@ -315,14 +315,12 @@ static NSString * const modelFileExtension = @".plist";
     NSAssert(bm, @"Expected object");
     NSAssert([bm isKindOfClass:[BaseModelObject class]], @"Expected subclass of BaseModelObject");
     NSAssert(bm.objectId.length > 0, @"Expected objectId");
-    if ([bm shouldPersistModelObject]) {
-        // we use the synchronized directive in order to lock based on the path
-        // this allows us to control read/write access across multiple threads
-        @synchronized([self pathForClass:bm.class andObjectId:bm.objectId]) {
-            [self addObjectToDiskCacheIdSetWithObjectId:bm.objectId
-                                           andClassName:[self stringNameForClass:bm.class]];
-            [bm persistToPath:[self pathForObject:bm]];
-        }
+    // we use the synchronized directive in order to lock based on the path
+    // this allows us to control read/write access across multiple threads
+    @synchronized([self pathForClass:bm.class andObjectId:bm.objectId]) {
+        [self addObjectToDiskCacheIdSetWithObjectId:bm.objectId
+                                       andClassName:[self stringNameForClass:bm.class]];
+        [bm persistToPath:[self pathForObject:bm]];
     }
 }
 

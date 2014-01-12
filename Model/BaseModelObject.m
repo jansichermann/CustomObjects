@@ -35,53 +35,53 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 
 #pragma mark - Initialization
 
-+ (id)newObjectWithId:(NSString *)objectId {
-    return [self newObjectWithId:objectId cached:NO];
++ (Class)classForDict:(NSDictionary *)dict {
+    return self.class;
 }
 
-+ (id)newObjectWithId:(NSString *)objectId cached:(BOOL)cached {
++ (id)newObjectWithId:(NSString *)objectId {
     if (objectId.length > 0) {
         BaseModelObject *m = [[self alloc] init];
         // the object id needs to be set before the caching behavior
         m.objectId = objectId;
-        // as setShouldCacheModel will remove or add the object from or to the cache
-        // which requires an objectId
-        m.shouldCacheModel = cached ? ModelCachingAlways : ModelCachingNever;
-        
         return m;
     }
     return nil;
 }
 
-+ (id)objectWithId:(NSString *)objectId cached:(BOOL)cached {
-    if (objectId == nil || objectId.length == 0) {
-        [modelObjectNoIdException raise];
++ (id)objectWithId:(NSString *)objectId {
+    if (objectId.length == 0) {
+        @throw modelObjectNoIdException;
     }
+    
     BaseModelObject *modelObject = nil;
     
     if (objectId && [objectId isKindOfClass:[NSString class]]) {
-        if (cached) {
-            modelObject = [[ModelManager shared] fetchObjectFromCacheWithClass:self andId:objectId];
-        }
+        modelObject =
+        [[ModelManager shared] fetchObjectFromCacheWithClass:self
+                                                       andId:objectId];
         
-        if (modelObject == nil && cached && [[ModelManager shared] hasDiskFileForObjectWithId:objectId andClass:self]) {
-            modelObject = [[ModelManager shared] fetchObjectFromDiskWithClass:self andId:objectId];
-        }
+        if (modelObject == nil &&
+            [[ModelManager shared] hasDiskFileForObjectWithId:objectId
+                                                     andClass:self]) {
+                modelObject =
+                [[ModelManager shared] fetchObjectFromDiskWithClass:self
+                                                              andId:objectId];
+            }
         
         if (modelObject == nil) {
-            modelObject = [self newObjectWithId:objectId cached:cached];
+            modelObject = [self newObjectWithId:objectId];
         }
         
-        if (modelObject && cached) {
-            [[ModelManager shared] addObjectToCache:modelObject];
-        }
+        [modelObject ensureCaching];
     }
     
     return modelObject;
 }
 
-+ (id)withDictionary:(NSDictionary *)dict cached:(BOOL)cached {
-    id r = [self objectWithId:dict[self.objectIdFieldName] cached:cached];
++ (id)withDictionary:(NSDictionary *)dict {
+    Class c = [self classForDict:dict];
+    id r = [c objectWithId:dict[self.objectIdFieldName]];
     if (r && [r updateWithDictionary:dict]) {
         return r;
     }
@@ -94,9 +94,7 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     if (dict[self.class.objectIdFieldName]) {
         SET_NONPRIMITIVE_IF_VAL_NOT_NIL([NSString class], self.objectId, dict[self.class.objectIdFieldName]);
         
-        if ([self shouldCacheModelObject]) {
-            [[ModelManager shared] addObjectToCache:self];
-        }
+        [self ensureCaching];
         return YES;
     }
     return NO;
@@ -108,6 +106,7 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 
 
 #pragma mark - NSCoding
+
 - (void)encodeWithCoder:(NSCoder *)encoder {
     [encoder encodeObject:self.objectId forKey:self.class.objectIdFieldName];
 }
@@ -118,42 +117,27 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     
     // we do this, as we assume that any object fetched from disk
     // is fetched from disk due to not being in cache
-    self = [self.class newObjectWithId:[decoder decodeObjectForKey:self.class.objectIdFieldName] cached:YES];
+    self = [self.class newObjectWithId:
+            [decoder decodeObjectForKey:self.class.objectIdFieldName]];
     return self;
 }
 
 
-#pragma mark - Caching behavior
-- (void)setShouldCacheModel:(ModelCachingBehavior)shouldCacheModel {
-    if (self.objectId == nil || self.objectId.length == 0) {
-        [modelObjectNoIdException raise];
-    }
-    
-    _shouldCacheModel = shouldCacheModel;
-    if (shouldCacheModel == ModelCachingAlways) {
-        [[ModelManager shared] addObjectToCache:self];
-    }
-    if (shouldCacheModel == ModelCachingNever) {
-        [[ModelManager shared] removeObjectFromCache:self];
-    }
-}
+#pragma mark - Caching
 
-- (BOOL)shouldCacheModelObject {
-    if (_shouldCacheModel == ModelCachingAlways)        return YES;
-    return NO;
+- (void)ensureCaching {
+    if (self.objectId.length == 0) {
+        @throw modelObjectNoIdException;
+    }
+    [[ModelManager shared] addObjectToCache:self];
 }
 
 
 #pragma mark - Persisting
-- (BOOL)shouldPersistModelObject {
-    return [self shouldCacheModelObject];
-}
 
 - (void)persistToPath:(NSString *)path {
-
     NSData *data = [NSKeyedArchiver archivedDataWithRootObject:self];
     if (![data writeToFile:path atomically:YES]) {
-        NSAssert(NO, @"persist failed");
         NSLog(@"### SOMETHING WENT WRONG TRYING TO PERSIST TO DISK ###");
     }
 }

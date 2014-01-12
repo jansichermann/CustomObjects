@@ -20,14 +20,6 @@
 #import <Foundation/Foundation.h>
 #import "ModelMacros.h"
 
-
-typedef enum {
-    ModelCachingNever = 0,      // never cache this object
-    ModelCachingAlways          // always cache this object
-} ModelCachingBehavior;
-
-
-
 #pragma mark - BaseModel Protocols
 
 @protocol ObjectIdProtocol <NSObject>
@@ -39,7 +31,6 @@ typedef enum {
 
 @interface BaseModelObject : NSObject <ObjectIdProtocol>
 
-@property (nonatomic) ModelCachingBehavior shouldCacheModel;
 
 MODEL_SINGLE_PROPERTY_H_INTERFACE(NSString, objectId);
 
@@ -47,9 +38,8 @@ MODEL_SINGLE_PROPERTY_H_INTERFACE(NSString, objectId);
 
 #pragma mark - Initialization
 + (id)newObjectWithId:(NSString *)objectId;
-+ (id)newObjectWithId:(NSString *)objectId cached:(BOOL)cached;
-+ (id)objectWithId:(NSString *)objectId cached:(BOOL)cached;
-+ (id)withDictionary:(NSDictionary *)dict cached:(BOOL)cached;
++ (id)objectWithId:(NSString *)objectId;
++ (id)withDictionary:(NSDictionary *)dict;
 
 
 #pragma mark - Object updating
@@ -62,8 +52,6 @@ MODEL_SINGLE_PROPERTY_H_INTERFACE(NSString, objectId);
 
 
 #pragma mark - Caching behavior
-- (BOOL)shouldCacheModelObject;
-- (BOOL)shouldPersistModelObject;
 
 - (void)persistToPath:(NSString *)path;
 + (id)loadFromPath:(NSString *)path;
