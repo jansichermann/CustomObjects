@@ -52,23 +52,11 @@ if ([_dict objectForKey:_key] == nil && _value != nil) { \
 }
 
 // single property
-#define MODEL_SINGLE_PROPERTY_H_RW_INTERFACE(_class, _name) \
-@property(nonatomic) _class *_name;
-
 #define MODEL_SINGLE_PROPERTY_H_INTERFACE(_class, _name) \
 @property(nonatomic, readonly) _class *_name;
 
 #define MODEL_SINGLE_PROPERTY_M_INTERFACE(_class, _name) \
 @property(nonatomic, readwrite) _class *_name;
-
-#define MODEL_SINGLE_PROPERTY_INT_H_RW_INTERFACE(_name) \
-@property (nonatomic) int _name;
-
-#define MODEL_SINGLE_PROPERTY_FLOAT_H_RW_INTERFACE(_name) \
-@property (nonatomic) float _name;
-
-#define MODEL_SINGLE_PROPERTY_DOUBLE_H_RW_INTERFACE(_name) \
-@property (nonatomic) double _name;
 
 // single relation
 

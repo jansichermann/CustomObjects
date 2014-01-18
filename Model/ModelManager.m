@@ -37,6 +37,7 @@ static const NSUInteger DEFAULT_CACHE_LIMIT = 0;
 @end
 
 
+
 // Exception
 NSException *modelObjectNoIdException;
 
@@ -49,7 +50,9 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
     if (self) {
         [self initializeCache];
         self.persistCount = 0;
-        modelObjectNoIdException = [NSException exceptionWithName:@"No Id" reason:@"Expected an objectId" userInfo:nil];
+        modelObjectNoIdException = [NSException exceptionWithName:@"No Id"
+                                                           reason:@"Expected an objectId"
+                                                         userInfo:nil];
         self.diskCacheIdsLock = [[NSLock alloc] init];
     }
     return self;
@@ -150,14 +153,14 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
 }
 
 - (void)removeObjectFromReferenceWithClass:(Class)class andId:(NSString *)objectId {
-    NSAssert(objectId != nil, @"Expected an objectId");
-    NSAssert(class != nil, @"Expected a class");
+    NSParameterAssert(objectId != nil);
+    NSParameterAssert(class != nil);
     [[self idSetForClass:class] removeObject:objectId];
 }
 
 - (void)_addObjectToCache:(BaseModelObject *)object {
-    NSAssert(object, @"Expected object");
-    NSAssert(object.objectId.length > 0, @"Expected objectId");
+    NSParameterAssert(object.objectId.length > 0);
+    NSParameterAssert([[NSThread currentThread] isMainThread]);
     
     // May want to do this from a BG Thread
     
@@ -166,17 +169,17 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
     if (cache == nil) {
         cache = [self createCacheForClass:object.class];
     }
-    NSAssert(cache, @"Expected cache");
+    NSParameterAssert(cache);
     
     [cache setObject:object forKey:object.objectId];
     NSMutableSet *idSet = [self idSetForClass:object.class];
-    NSAssert(idSet, @"Expected idSet");
+    NSParameterAssert(idSet);
     [idSet addObject:object.objectId];
 }
 
 - (void)addObjectToCache:(BaseModelObject *)object {
-    NSAssert(object, @"Expected object to be valid");
-    NSAssert(object.objectId.length > 0, @"Expected objectId to be valid");
+    NSParameterAssert(object.objectId.length > 0);
+    NSParameterAssert([[NSThread currentThread] isMainThread]);
     [self _addObjectToCache:object];
 }
 
@@ -191,17 +194,20 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
 
 #pragma mark - Object Retrieval
 
-- (BaseModelObject *)_fetchObjectFromCacheWithClass:(Class)class andId:(NSString *)objectId {
+- (BaseModelObject *)_fetchObjectFromCacheWithClass:(Class)class
+                                              andId:(NSString *)objectId {
     NSCache *cache = [self cacheForClass:class];
     return [cache objectForKey:objectId];
 }
 
-- (BaseModelObject *)fetchObjectFromCacheWithClass:(Class)class andId:(NSString *)objectId {
+- (BaseModelObject *)fetchObjectFromCacheWithClass:(Class)class
+                                             andId:(NSString *)objectId {
     BaseModelObject *bm = [self _fetchObjectFromCacheWithClass:class andId:objectId];
     return bm;
 }
 
-- (BaseModelObject *)fetchObjectFromDiskWithClass:(Class)class andId:(NSString *)objectId {
+- (BaseModelObject *)fetchObjectFromDiskWithClass:(Class)class
+                                            andId:(NSString *)objectId {
     BaseModelObject *bm = nil;
     
     NSString *path = [self pathForClass:class andObjectId:objectId];
@@ -238,7 +244,11 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
     NSArray *modelCacheDirs = [self modelCacheDirectoriesOnDisk];
     
     for (NSURL *classPathDir in modelCacheDirs) {
-        NSArray *cachedObjectFiles = [[NSFileManager defaultManager] contentsOfDirectoryAtURL:classPathDir includingPropertiesForKeys:@[NSURLIsRegularFileKey] options:0 error:nil];
+        NSArray *cachedObjectFiles =
+        [[NSFileManager defaultManager] contentsOfDirectoryAtURL:classPathDir
+                                      includingPropertiesForKeys:@[NSURLIsRegularFileKey]
+                                                         options:0
+                                                           error:nil];
         
         for (NSURL *cachedObjectFilePath in cachedObjectFiles) {
             NSArray *pathComponents = cachedObjectFilePath.pathComponents;
@@ -250,7 +260,8 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
                 NSRange plistRange = [fileName rangeOfString:modelFileExtension];
                 if (plistRange.location != NSNotFound) {
                     NSString *objectId = [fileName substringToIndex:plistRange.location];
-                    [self addObjectToDiskCacheIdSetWithObjectId:objectId andClassName:modelClassName];
+                    [self addObjectToDiskCacheIdSetWithObjectId:objectId
+                                                   andClassName:modelClassName];
                 }
             }
         }
@@ -271,14 +282,16 @@ SHARED_SINGLETON_IMPLEMENTATION(ModelManager);
 #pragma mark - Persisting
 
 + (NSString *)cacheDirectory {
-    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory,
+                                                         NSUserDomainMask,
+                                                         YES);
     return paths[0];
 }
 
 static NSString * const modelPathComponent = @"models";
 
 - (NSString *)pathForClassName:(NSString *)cName {
-    NSAssert(cName.length > 0, @"cName.length must be > 0");
+    NSParameterAssert(cName.length > 0);
     return [[[self.class cacheDirectory] stringByAppendingPathComponent:modelPathComponent] stringByAppendingPathComponent:cName];
 }
 
@@ -299,22 +312,22 @@ static NSString * const modelPathComponent = @"models";
     return dirs;
 }
 
-static NSString * const modelFileExtension = @".plist";
+static NSString * const modelFileExtension = @".cache";
 
 - (NSString *)pathForClass:(Class)class andObjectId:(NSString *)objectId {
-    NSAssert(objectId.length > 0, @"Expected objectId");
+    NSParameterAssert(objectId.length > 0);
     return [NSString stringWithFormat:@"%@%@", [[self pathForClassName:[self stringNameForClass:class]] stringByAppendingPathComponent:objectId], modelFileExtension];
 }
 
 - (NSString *)pathForObject:(BaseModelObject *)object {
-    NSAssert(object != nil, @"Expected Object");
+    NSParameterAssert(object != nil);
     return [self pathForClass:object.class andObjectId:object.objectId];
 }
 
 - (void)persistObjectIfAppropriate:(BaseModelObject *)bm {
-    NSAssert(bm, @"Expected object");
-    NSAssert([bm isKindOfClass:[BaseModelObject class]], @"Expected subclass of BaseModelObject");
-    NSAssert(bm.objectId.length > 0, @"Expected objectId");
+    NSParameterAssert(bm);
+    NSParameterAssert([bm isKindOfClass:[BaseModelObject class]]);
+    NSParameterAssert(bm.objectId.length > 0);
     // we use the synchronized directive in order to lock based on the path
     // this allows us to control read/write access across multiple threads
     @synchronized([self pathForClass:bm.class andObjectId:bm.objectId]) {
@@ -328,9 +341,11 @@ static NSString * const modelFileExtension = @".plist";
     UIApplication *application = [UIApplication sharedApplication];
     UIBackgroundTaskIdentifier taskIdentifier = UIBackgroundTaskInvalid;
     taskIdentifier = [application beginBackgroundTaskWithExpirationHandler:^{
-        [application endBackgroundTask:taskIdentifier];
+        if (taskIdentifier != UIBackgroundTaskInvalid) {
+            [application endBackgroundTask:taskIdentifier];
+        }
     }];
-
+    
     ++self.persistCount;
     
     for (NSString *className in self.modelCacheIds.allKeys.copy) {
@@ -348,10 +363,10 @@ static NSString * const modelFileExtension = @".plist";
             NSSet *classIdSet = [[self idSetForClass:objectClass] copy];
             
             for (NSString *objectId in classIdSet) {
-                NSAssert(objectId.length > 0, @"Expected objectId");
+                NSParameterAssert(objectId.length > 0);
                 BaseModelObject *m = [self _fetchObjectFromCacheWithClass:objectClass
                                                                     andId:objectId];
-                NSAssert(m, @"Expected Object");
+                NSParameterAssert(m);
                 [self persistObjectIfAppropriate:m];
             }
         }
@@ -359,6 +374,7 @@ static NSString * const modelFileExtension = @".plist";
     [self persistCompleted];
     
     [application endBackgroundTask:taskIdentifier];
+    taskIdentifier = UIBackgroundTaskInvalid;
 }
 
 - (void)persistCompleted {
