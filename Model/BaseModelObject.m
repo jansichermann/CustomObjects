@@ -17,8 +17,6 @@
 // limitations under the License.
 
 #import "BaseModelObject.h"
-#import "ModelManager.h"
-
 
 
 @interface BaseModelObject ()
@@ -35,138 +33,63 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 
 #pragma mark - Initialization
 
-+ (Class)classForDict:(NSDictionary *)dict {
++ (NSString *)objectIdFromDict:(NSDictionary *)dict {
+    return dict[self.objectIdFieldName];
+}
+
++ (NSString *)objectIdFieldName {
+    return @"id";
+}
+
++ (Class)classFromDict:(NSDictionary *)dict {
     return self.class;
+}
+
++ (instancetype)withDict:(NSDictionary *)dict
+          inCacheManager:(NSObject <ObjectCacheManagerProtocol> *)cacheManager {
+    NSParameterAssert([self conformsToProtocol:@protocol(ObjectDictionaryProtocol)]);
+    NSParameterAssert([self respondsToSelector:@selector(objectIdFieldName)] ||
+                      [self respondsToSelector:@selector(objectIdFromDict:)]);
+    NSString *objectId = [self objectIdFromDict:dict];
+    NSParameterAssert(objectId.length > 0);
+    
+    Class c = [self classFromDict:dict];
+    NSObject<ObjectIdProtocol> *obj = [cacheManager fetchObjectFromCacheWithClass:c
+                                          andId:objectId];
+    if (!obj) {
+        obj = [self.class newObjectWithDictionary:dict];
+        [cacheManager addObjectToCache:obj];
+    }
+    return (BaseModelObject *)obj;
 }
 
 + (id)newObjectWithId:(NSString *)objectId {
     if (objectId.length > 0) {
         BaseModelObject *m = [[self alloc] init];
-        // the object id needs to be set before the caching behavior
         m.objectId = objectId;
         return m;
     }
     return nil;
 }
 
-+ (id)objectWithId:(NSString *)objectId {
-    if (objectId.length == 0) {
-        @throw modelObjectNoIdException;
-    }
-    
-    BaseModelObject *modelObject = nil;
-    
-    if (objectId && [objectId isKindOfClass:[NSString class]]) {
-        modelObject =
-        [[ModelManager shared] fetchObjectFromCacheWithClass:self
-                                                       andId:objectId];
-        
-        if (modelObject == nil &&
-            [[ModelManager shared] hasDiskFileForObjectWithId:objectId
-                                                     andClass:self]) {
-                modelObject =
-                [[ModelManager shared] fetchObjectFromDiskWithClass:self
-                                                              andId:objectId];
-            }
-        
-        if (modelObject == nil) {
-            modelObject = [self newObjectWithId:objectId];
-        }
-        
-        [modelObject ensureCaching];
-    }
-    
-    return modelObject;
-}
-
-+ (id)withDictionary:(NSDictionary *)dict {
-    Class c = [self classForDict:dict];
-    id r = [c objectWithId:dict[self.objectIdFieldName]];
++ (instancetype)newObjectWithDictionary:(NSDictionary *)dict {
+    Class c = [self classFromDict:dict];
+    id r = [c newObjectWithId:[self objectIdFromDict:dict]];
     if (r && [r updateWithDictionary:dict]) {
         return r;
     }
     return nil;
 }
 
-
 #pragma mark - Object updating
 - (BOOL)updateWithDictionary:(NSDictionary *)dict {
     if (dict[self.class.objectIdFieldName]) {
-        SET_NONPRIMITIVE_IF_VAL_NOT_NIL([NSString class], self.objectId, dict[self.class.objectIdFieldName]);
-        
-        [self ensureCaching];
+        SET_NONPRIMITIVE_IF_VAL_NOT_NIL([NSString class],
+                                        self.objectId,
+                                        dict[self.class.objectIdFieldName]);
         return YES;
     }
     return NO;
-}
-
-+ (NSString *)objectIdFieldName {
-    return @"_id";
-}
-
-
-#pragma mark - NSCoding
-
-- (void)encodeWithCoder:(NSCoder *)encoder {
-    [encoder encodeObject:self.objectId forKey:self.class.objectIdFieldName];
-}
-
-- (BaseModelObject *)initWithCoder:(NSCoder *)decoder {
-    // we set the caching behavior to yes,
-    // which overrides any object in cache
-    
-    // we do this, as we assume that any object fetched from disk
-    // is fetched from disk due to not being in cache
-    self = [self.class newObjectWithId:
-            [decoder decodeObjectForKey:self.class.objectIdFieldName]];
-    return self;
-}
-
-
-#pragma mark - Caching
-
-- (void)ensureCaching {
-    if (self.objectId.length == 0) {
-        @throw modelObjectNoIdException;
-    }
-    [[ModelManager shared] addObjectToCache:self];
-}
-
-
-#pragma mark - Persisting
-
-- (void)persistToPath:(NSString *)path {
-    NSData *data = [NSKeyedArchiver archivedDataWithRootObject:self];
-    if (![data writeToFile:path atomically:YES]) {
-        NSLog(@"### SOMETHING WENT WRONG TRYING TO PERSIST TO DISK ###");
-    }
-}
-
-+ (id)loadFromPath:(NSString *)path {
-    if ([[NSFileManager defaultManager] fileExistsAtPath:path]) {
-        @try {
-            id obj = [NSKeyedUnarchiver unarchiveObjectWithFile:path];
-            return obj;
-        }
-        @catch (NSException *exception) {
-            NSLog(@"### FILE AT PATH DID NOT CONTAIN VALID ARCHIVE ###");
-#if UNITTESTING
-            [exception raise];
-#endif
-        }
-        @finally {
-        }
-    }
-    return nil;
-}
-
-
-#pragma mark - Debugging and Testing
-
-+ (NSMutableDictionary *)modelTestDictionary {
-    NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
-    dictionary[self.objectIdFieldName] = @"KHJZXV8YQ345HKJLXCVBNMER89Y";
-    return dictionary;
 }
 
 @end

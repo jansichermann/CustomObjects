@@ -16,22 +16,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-// SINGLETON
-#define SHARED_SINGLETON_HEADER(_class) \
-+ (_class *)shared;
-
-#define SHARED_SINGLETON_IMPLEMENTATION(_class) \
-+ (_class *)shared { \
-    static dispatch_once_t once; \
-    static _class *sharedInstance = nil; \
-    dispatch_once(&once, ^{ \
-        sharedInstance = [[self alloc] init]; \
-    }); \
-    return sharedInstance; \
-}
-
-
 #define WEAK(_obj) \
 __weak __typeof__(_obj) weak_ ## _obj = _obj
 
@@ -91,57 +75,6 @@ return _ ## _name; \
 }
 
 
-
-// multi relation
-
-#define MODEL_MULTI_RELATION_H_INTERFACE(_class, _name, _Name) \
-- (NSArray *)_name; \
-- (void)add ## _Name ## Object:(_class *)object; \
-- (void)remove ## _Name ## Object:(_class *)object; \
-- (void)set ## _Name:(NSArray *)objects;
-
-#define MODEL_MULTI_RELATION_M_INTERFACE(_class, _name) \
-@property (nonatomic) NSMutableOrderedSet *_name ## Ids; \
-@property (nonatomic) NSMutableOrderedSet *_name ## OrderedMutableSet;
-
-#define MODEL_MULTI_RELATION_M_IMPLEMENTATION(_class, _name, _Name) \
-- (NSArray *)_name { \
-    if (self._name ## Ids == nil || self._name ## Ids.count < 1) return nil; \
-    if (self._name ## OrderedMutableSet.count != self._name ## Ids.count || self._name ## OrderedMutableSet == nil) { \
-        self._name ## OrderedMutableSet = [NSMutableOrderedSet orderedSet]; \
-        for (NSString *objectId in self._name ## Ids) { \
-            [self._name ## OrderedMutableSet addObject: [_class objectWithId:objectId cached:[self shouldCacheModelObject]] ]; \
-        } \
-    } \
-    return self._name ## OrderedMutableSet.array; \
-} \
-- (void)add ## _Name ## Object:(_class *)object { \
-    if (self._name ## Ids == nil) { \
-        self._name ## Ids = [NSMutableOrderedSet orderedSet]; \
-    } \
-    [self._name ## Ids addObject:object.objectId]; \
-    [self._name ## OrderedMutableSet addObject: object]; \
-} \
-- (void)remove ## _Name ## Object:(_class *)object { \
-    [self._name ## Ids removeObject:object.objectId]; \
-    [self._name ## OrderedMutableSet removeObject: object]; \
-} \
-- (void)set ## _Name:(NSArray *)objects { \
-    if (self._name ## Ids == nil) { \
-        self._name ## Ids = [NSMutableOrderedSet orderedSet]; \
-    } \
-    for (id<ObjectIdProtocol> object in objects) { \
-        if (![object conformsToProtocol:@protocol(ObjectIdProtocol)]) { \
-[[NSException exceptionWithName:@"Object Conformity" reason:[NSString stringWithFormat:@"Expected object of type %@ to conform to <ObjectIdProtocol>", NSStringFromClass([object class])] userInfo:nil] raise]; \
-            continue; \
-        } \
-        [self._name ## Ids addObject:object.objectId]; \
-        [self._name ## OrderedMutableSet addObject:object]; \
-    } \
-}
-
-
-
 // NSCoding
 
 #define DECODE_IF_CLASS_CONSISTENCY(_var, _keyName) \
@@ -151,10 +84,3 @@ _var = [decoder decodeObjectForKey:_keyName]; \
 
 #define ENCODE_OBJECT(_var, _keyName) \
 [encoder encodeObject:_var forKey:_keyName];
-
-#define ENCODE_INT(_var, _keyName) \
-[encoder encodeInteger:_var forKey:_keyName];
-
-#define DECODE_INT(_var, _keyName) \
-_var = [decoder decodeIntegerForKey:_keyName];
-

@@ -19,44 +19,29 @@
 
 #import <Foundation/Foundation.h>
 #import "ModelMacros.h"
-
-#pragma mark - BaseModel Protocols
-
-@protocol ObjectIdProtocol <NSObject>
-- (NSString *)objectId;
-@end
+#import "ModelProtocols.h"
 
 
 #pragma mark - BaseModel Interface
 
-@interface BaseModelObject : NSObject <ObjectIdProtocol>
+@interface BaseModelObject : NSObject
+<
+ObjectIdProtocol,
+ObjectDictionaryProtocol
+>
 
 
-MODEL_SINGLE_PROPERTY_H_INTERFACE(NSString, objectId);
-
-
++ (instancetype)withDict:(NSDictionary *)dict
+          inCacheManager:(NSObject <ObjectCacheManagerProtocol> *)cacheManager;
 
 #pragma mark - Initialization
 + (id)newObjectWithId:(NSString *)objectId;
-+ (id)objectWithId:(NSString *)objectId;
-+ (id)withDictionary:(NSDictionary *)dict;
++ (id)newObjectWithDictionary:(NSDictionary *)dict;
 
 
 #pragma mark - Object updating
 - (BOOL)updateWithDictionary:(NSDictionary *)dict;
 + (NSString *)objectIdFieldName;
 
-#pragma mark - NSCoding
-- (void)encodeWithCoder:(NSCoder *)encoder;
-- (BaseModelObject *)initWithCoder:(NSCoder *)decoder;
 
-
-#pragma mark - Caching behavior
-
-- (void)persistToPath:(NSString *)path;
-+ (id)loadFromPath:(NSString *)path;
-
-
-#pragma mark - Debugging and Testing
-+ (NSMutableDictionary *)modelTestDictionary;
 @end

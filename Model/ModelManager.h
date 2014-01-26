@@ -17,44 +17,9 @@
 // limitations under the License.
 
 #import <Foundation/Foundation.h>
-#import "ModelMacros.h"
+#import "ModelProtocols.h"
 
 
+@interface ModelManager : NSObject <ObjectCacheManagerProtocol>
 
-
-// Exceptions
-extern NSException *modelObjectNoIdException;
-
-
-
-
-@class BaseModelObject;
-
-@interface ModelManager : NSObject <NSCacheDelegate>
-
-SHARED_SINGLETON_HEADER(ModelManager);
-
-// can be queried to gain insight into whether a persist operation
-// is about to be, or currently being executed
-@property (readonly) BOOL persistScheduled;
-
-- (void)removeObjectFromCache:(BaseModelObject *)object;
-- (void)addObjectToCache:(BaseModelObject *)object;
-
-- (BaseModelObject *)fetchObjectFromCacheWithClass:(Class)class andId:(NSString *)objectId;
-- (BaseModelObject *)fetchObjectFromDiskWithClass:(Class)class andId:(NSString *)objectId;
-
-- (void)primeDiskModelIds;
-- (BOOL)hasDiskFileForObjectWithId:(NSString *)objectId andClass:(Class)objectClass;
-
-+ (NSString *)cacheDirectory;
-- (NSArray *)cacheNames;
-- (void)persist;
-- (void)wipeDiskCache;
-
-
-// this should only be used for unit-testing and debug
-// clearing the cache does not have any
-// influence on pointers held to objects
-- (void)clearCache;
 @end
