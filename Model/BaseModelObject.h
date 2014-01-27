@@ -30,13 +30,15 @@ ObjectIdProtocol,
 ObjectDictionaryProtocol
 >
 
+@property (nonatomic, weak, readonly) NSObject<ObjectCacheManagerProtocol> *cacheManager;
 
 + (instancetype)withDict:(NSDictionary *)dict
           inCacheManager:(NSObject <ObjectCacheManagerProtocol> *)cacheManager;
 
 #pragma mark - Initialization
 + (id)newObjectWithId:(NSString *)objectId;
-+ (id)newObjectWithDictionary:(NSDictionary *)dict;
++ (instancetype)newObjectWithDictionary:(NSDictionary *)dict
+                         inCacheManager:(NSObject<ObjectCacheManagerProtocol> *)cacheManager;
 
 
 #pragma mark - Object updating

@@ -24,7 +24,7 @@
 @interface BaseModelObject ()
 
 MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
-
+@property (nonatomic, weak, readwrite) NSObject<ObjectCacheManagerProtocol> *cacheManager;
 @end
 
 
@@ -56,13 +56,21 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     NSParameterAssert(objectId.length > 0);
     
     Class c = [self classFromDict:dict];
-    NSObject<ObjectIdProtocol> *obj = [cacheManager fetchObjectFromCacheWithClass:c
-                                          andId:objectId];
-    if (!obj) {
-        obj = [self.class newObjectWithDictionary:dict];
-        [cacheManager addObjectToCache:obj];
+    BaseModelObject *obj =
+    (BaseModelObject *)[cacheManager fetchObjectFromCacheWithClass:c
+                                                             andId:objectId];
+    NSParameterAssert(obj == nil ||
+                      ![obj isKindOfClass:[BaseModelObject class]]);
+    
+    if (obj) {
+        NSParameterAssert(obj.cacheManager != nil);
+        [obj updateWithDictionary:dict];
     }
-    return (BaseModelObject *)obj;
+    else {
+        obj = [self.class newObjectWithDictionary:dict
+                                   inCacheManager:cacheManager];
+    }
+    return obj;
 }
 
 + (id)newObjectWithId:(NSString *)objectId {
@@ -74,9 +82,12 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     return nil;
 }
 
-+ (instancetype)newObjectWithDictionary:(NSDictionary *)dict {
++ (instancetype)newObjectWithDictionary:(NSDictionary *)dict
+                         inCacheManager:(NSObject<ObjectCacheManagerProtocol> *)cacheManager {
     Class c = [self classFromDict:dict];
-    id r = [c newObjectWithId:[self objectIdFromDict:dict]];
+    BaseModelObject *r = [c newObjectWithId:[self objectIdFromDict:dict]];
+    [cacheManager addObjectToCache:r];
+    r.cacheManager = cacheManager;
     if (r && [r updateWithDictionary:dict]) {
         return r;
     }
@@ -129,7 +140,7 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
         }
         c = c.superclass;
     }
-
+    
     return properties.copy;
 }
 
