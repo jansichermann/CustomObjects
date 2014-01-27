@@ -95,26 +95,42 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 }
 
 - (NSString *)description {
-    return [self.allPropertyNames componentsJoinedByString:@"\n"];
+    NSString *s = @"\n";
+    for (NSString *propName in self.propertyNames) {
+        s = [s stringByAppendingFormat:@"%@: %@\n", propName, [[self valueForKey:propName] description]];
+    }
+    return s;
 }
 
-- (NSArray *)allPropertyNames {
-    unsigned count;
-    objc_property_t *properties = class_copyPropertyList([self class], &count);
-    
-    NSMutableArray *rv = [NSMutableArray array];
-    
-    unsigned i;
-    for (i = 0; i < count; i++)
-    {
-        objc_property_t property = properties[i];
+- (NSArray *)_propertyNamesForClass:(Class)c {
+    NSMutableArray *props = [NSMutableArray array];
+    unsigned int i;
+    objc_property_t *properties = class_copyPropertyList(c, &i);
+    for (unsigned int ii = 0; ii < i; ii++) {
+        objc_property_t property = properties[ii];
         NSString *name = [NSString stringWithUTF8String:property_getName(property)];
-        [rv addObject:name];
+        [props addObject:name];
     }
     
     free(properties);
     
-    return rv;
+    return props;
+}
+
+- (NSArray *)propertyNames {
+    NSMutableArray *properties = [NSMutableArray array];
+    
+    Class c = self.class;
+    
+    while (YES) {
+        [properties addObjectsFromArray:[self _propertyNamesForClass:c]];
+        if (c == [BaseModelObject class]) {
+            break;
+        }
+        c = c.superclass;
+    }
+
+    return properties.copy;
 }
 
 @end
