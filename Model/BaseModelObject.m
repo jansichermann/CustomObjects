@@ -59,8 +59,8 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     BaseModelObject *obj =
     (BaseModelObject *)[cacheManager fetchObjectFromCacheWithClass:c
                                                              andId:objectId];
-    NSParameterAssert(obj == nil ||
-                      ![obj isKindOfClass:[BaseModelObject class]]);
+    NSParameterAssert((obj == nil ||
+                      [obj isKindOfClass:[BaseModelObject class]]));
     
     if (obj) {
         NSParameterAssert(obj.cacheManager != nil);
