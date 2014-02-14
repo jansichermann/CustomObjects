@@ -100,15 +100,24 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 
 #pragma mark - Temporary Object
 
-- (id)uncachedCopy {
-    BaseModelObject *m = self.copy;
-    NSString *tempId = [NSString stringWithFormat:@"temp_%f_%d",
++ (instancetype)uncachedObject {
+    BaseModelObject *m = [self newObjectWithId:self.newTemporaryId];
+    return m;
+}
+
++ (NSString *)newTemporaryId {
+    return [NSString stringWithFormat:@"temp_%f_%d",
                         [[NSDate date] timeIntervalSince1970],
                         arc4random() % 10000
                         ];
-    m.objectId = tempId;
+
+}
+
+- (instancetype)uncachedCopy {
+    BaseModelObject *m = self.copy;
+    m.objectId = [self.class newTemporaryId];
     m.isTempObject = YES;
-    return tempId;
+    return m;
 }
 
 

@@ -47,4 +47,8 @@ NSCopying
 + (NSString *)objectIdFieldName;
 
 
+#pragma mark - Temporary Object
++ (instancetype)uncachedObject;
+- (instancetype)uncachedCopy;
+
 @end
