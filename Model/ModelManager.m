@@ -106,6 +106,7 @@ static const NSUInteger DEFAULT_CACHE_LIMIT = 0;
 - (void)_addObjectToCache:(NSObject<ObjectIdProtocol> *)object {
     NSParameterAssert(object.objectId.length > 0);
     NSParameterAssert([[NSThread currentThread] isMainThread]);
+    NSParameterAssert(!object.isTempObject);
     
     NSCache *cache = [self cacheForClass:object.class];
     

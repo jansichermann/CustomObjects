@@ -12,6 +12,7 @@
 @protocol ObjectIdProtocol <NSObject>
 
 - (NSString *)objectId;
+- (BOOL)isTempObject;
 
 @end
 

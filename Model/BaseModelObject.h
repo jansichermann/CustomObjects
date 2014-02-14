@@ -27,7 +27,8 @@
 @interface BaseModelObject : NSObject
 <
 ObjectIdProtocol,
-ObjectDictionaryProtocol
+ObjectDictionaryProtocol,
+NSCopying
 >
 
 @property (nonatomic, weak, readonly) NSObject<ObjectCacheManagerProtocol> *cacheManager;

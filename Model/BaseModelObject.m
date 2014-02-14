@@ -25,6 +25,8 @@
 
 MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 @property (nonatomic, weak, readwrite) NSObject<ObjectCacheManagerProtocol> *cacheManager;
+@property (nonatomic) BOOL isTempObject;
+
 @end
 
 
@@ -53,8 +55,10 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     NSParameterAssert([self respondsToSelector:@selector(objectIdFieldName)] ||
                       [self respondsToSelector:@selector(objectIdFromDict:)]);
     NSString *objectId = [self objectIdFromDict:dict];
-    NSParameterAssert(objectId.length > 0);
-    
+    if (!objectId.length > 0) {
+        return nil;
+    }
+
     Class c = [self classFromDict:dict];
     BaseModelObject *obj =
     (BaseModelObject *)[cacheManager fetchObjectFromCacheWithClass:c
@@ -93,6 +97,20 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     }
     return nil;
 }
+
+#pragma mark - Temporary Object
+
+- (id)uncachedCopy {
+    BaseModelObject *m = self.copy;
+    NSString *tempId = [NSString stringWithFormat:@"temp_%f_%d",
+                        [[NSDate date] timeIntervalSince1970],
+                        arc4random() % 10000
+                        ];
+    m.objectId = tempId;
+    m.isTempObject = YES;
+    return tempId;
+}
+
 
 #pragma mark - Object updating
 - (BOOL)updateWithDictionary:(NSDictionary *)dict {
@@ -144,4 +162,15 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     return properties.copy;
 }
 
+#pragma mark - NSCopying
+
+- (id)copyWithZone:(NSZone *)zone {
+    BaseModelObject *bm = [self.class newObjectWithId:self.objectId];
+                           
+    for (NSString *propName in self.propertyNames) {
+        [bm setValue:[[self valueForKey:propName] copyWithZone:zone]
+              forKey:propName];
+    }
+    return bm;
+}
 @end
