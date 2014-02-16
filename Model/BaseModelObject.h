@@ -36,16 +36,27 @@ NSCopying
 + (instancetype)withDict:(NSDictionary *)dict
           inCacheManager:(NSObject <ObjectCacheManagerProtocol> *)cacheManager;
 
+
 #pragma mark - Initialization
 + (id)newObjectWithId:(NSString *)objectId;
-+ (instancetype)newObjectWithDictionary:(NSDictionary *)dict
-                         inCacheManager:(NSObject<ObjectCacheManagerProtocol> *)cacheManager;
 
+
+#pragma mark - Object Fetching
+/**
+ @return A cached version of the object with id,
+ all properties may be nil
+ */
++ (id)objectWithId:(NSString *)objectId
+    inCacheManager:(NSObject <ObjectCacheManagerProtocol> *)cacheManager;
 
 #pragma mark - Object updating
 - (BOOL)updateWithDictionary:(NSDictionary *)dict;
-+ (NSString *)objectIdFieldName;
++ (NSString *)objectIdFieldName __attribute__((const));
 
+
+#pragma mark - Temporary Object
++ (instancetype)uncachedObject;
+- (instancetype)uncachedCopy;
 
 #pragma mark - Temporary Object
 + (instancetype)uncachedObject;

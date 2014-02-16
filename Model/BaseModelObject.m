@@ -41,39 +41,61 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     return dict[self.objectIdFieldName];
 }
 
-+ (NSString *)objectIdFieldName {
++ (NSString *)objectIdFieldName __attribute__((const)) {
     return @"id";
 }
 
-+ (Class)classFromDict:(NSDictionary *)dict {
++ (Class)classFromDict:(NSDictionary *)dict __attribute__((pure)) {
     return self.class;
 }
+
++ (BOOL)isValidModelDict:(NSDictionary *)dict {
+    return [self objectIdFromDict:dict].length > 0 &&
+    [self classFromDict:dict] != nil;
+}
+
 
 + (instancetype)withDict:(NSDictionary *)dict
           inCacheManager:(NSObject <ObjectCacheManagerProtocol> *)cacheManager {
     NSParameterAssert([self conformsToProtocol:@protocol(ObjectDictionaryProtocol)]);
     NSParameterAssert([self respondsToSelector:@selector(objectIdFieldName)] ||
                       [self respondsToSelector:@selector(objectIdFromDict:)]);
+    if (![self isValidModelDict:dict]) {
+        return nil;
+    }
+    
     NSString *objectId = [self objectIdFromDict:dict];
     if (!objectId.length > 0) {
         return nil;
     }
-
-    Class c = [self classFromDict:dict];
-    BaseModelObject *obj =
-    (BaseModelObject *)[cacheManager fetchObjectFromCacheWithClass:c
-                                                             andId:objectId];
-    NSParameterAssert((obj == nil ||
-                      [obj isKindOfClass:[BaseModelObject class]]));
     
-    if (obj) {
-        NSParameterAssert(obj.cacheManager != nil);
-        [obj updateWithDictionary:dict];
+    Class c = [self classFromDict:dict];
+    if (![c isSubclassOfClass:[BaseModelObject class]]) {
+        return nil;
     }
-    else {
-        obj = [self.class newObjectWithDictionary:dict
-                                   inCacheManager:cacheManager];
+    
+    BaseModelObject *obj = [c objectWithId:objectId
+                            inCacheManager:cacheManager];
+    
+    NSParameterAssert(obj.cacheManager != nil);
+    [obj updateWithDictionary:dict];
+    
+    return obj;
+}
+
++ (id)objectWithId:(NSString *)objectId
+    inCacheManager:(NSObject <ObjectCacheManagerProtocol> *)cacheManager {
+    BaseModelObject *obj =
+    (BaseModelObject *)[cacheManager fetchObjectFromCacheWithClass:self.class
+                                                             andId:objectId];
+    
+    if (!obj) {
+        obj =
+        [self.class newObjectWithId:objectId];
+        [cacheManager addObjectToCache:obj];
+        obj.cacheManager = cacheManager;
     }
+    NSParameterAssert([obj isKindOfClass:[BaseModelObject class]]);
     return obj;
 }
 
@@ -82,18 +104,6 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
         BaseModelObject *m = [[self alloc] init];
         m.objectId = objectId;
         return m;
-    }
-    return nil;
-}
-
-+ (instancetype)newObjectWithDictionary:(NSDictionary *)dict
-                         inCacheManager:(NSObject<ObjectCacheManagerProtocol> *)cacheManager {
-    Class c = [self classFromDict:dict];
-    BaseModelObject *r = [c newObjectWithId:[self objectIdFromDict:dict]];
-    [cacheManager addObjectToCache:r];
-    r.cacheManager = cacheManager;
-    if (r && [r updateWithDictionary:dict]) {
-        return r;
     }
     return nil;
 }
@@ -140,6 +150,27 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     return s;
 }
 
+- (NSArray *)_writeableNamesForClass:(Class)c {
+    NSMutableArray *props = [NSMutableArray array];
+    unsigned int i;
+    objc_property_t *properties = class_copyPropertyList(c, &i);
+    for (unsigned int ii = 0; ii < i; ii++) {
+        objc_property_t property = properties[ii];
+
+        NSString *name = [NSString stringWithUTF8String:property_getName(property)];
+
+        const char *pa = property_getAttributes(property);
+        NSString *propType = [NSString stringWithUTF8String:pa];
+        if ([propType rangeOfString:@"R"].location == NSNotFound) {
+            [props addObject:name];
+        }
+    }
+    
+    free(properties);
+    
+    return props;
+}
+
 - (NSArray *)_propertyNamesForClass:(Class)c {
     NSMutableArray *props = [NSMutableArray array];
     unsigned int i;
@@ -153,6 +184,20 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     free(properties);
     
     return props;
+}
+
+
+- (NSArray *)writeablePropertyNames {
+    NSMutableArray *properties = [NSMutableArray array];
+    Class c = self.class;
+    while (YES) {
+        [properties addObjectsFromArray:[self _writeableNamesForClass:c]];
+        if (c == [BaseModelObject class]) {
+            break;
+        }
+        c = c.superclass;
+    }
+    return properties.copy;
 }
 
 - (NSArray *)propertyNames {
@@ -175,10 +220,13 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 
 - (id)copyWithZone:(NSZone *)zone {
     BaseModelObject *bm = [self.class newObjectWithId:self.objectId];
-                           
-    for (NSString *propName in self.propertyNames) {
-        [bm setValue:[[self valueForKey:propName] copyWithZone:zone]
-              forKey:propName];
+    
+    for (NSString *propName in self.writeablePropertyNames) {
+        id prop = [self valueForKey:propName];
+        if ([prop conformsToProtocol:@protocol(NSCopying)]) {
+            [bm setValue:[prop copyWithZone:zone]
+                  forKey:propName];
+        };
     }
     return bm;
 }

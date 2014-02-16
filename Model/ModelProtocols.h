@@ -3,7 +3,8 @@
 @optional
 + (NSString *)objectIdFromDict:(NSDictionary *)dict;
 + (NSString *)objectIdFieldName;
-+ (Class)classFromDict:(NSDictionary *)dict;
++ (Class)classFromDict:(NSDictionary *)dict __attribute__((pure));
++ (BOOL)isValidModelDict:(NSDictionary *)dict;
 
 @end
 
