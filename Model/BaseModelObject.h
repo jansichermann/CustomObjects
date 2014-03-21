@@ -17,7 +17,7 @@
 // limitations under the License.
 
 
-#import <Foundation/Foundation.h>
+@import Foundation;
 #import "ModelMacros.h"
 #import "ModelProtocols.h"
 
@@ -28,7 +28,9 @@
 <
 ObjectIdProtocol,
 ObjectDictionaryProtocol,
-NSCopying
+NSCopying,
+CacheableObjectProtocol,
+ObjectArchivingProtocol
 >
 
 @property (nonatomic, weak, readonly) NSObject<ObjectCacheManagerProtocol> *cacheManager;
@@ -57,9 +59,6 @@ NSCopying
 #pragma mark - Temporary Object
 + (instancetype)uncachedObject;
 - (instancetype)uncachedCopy;
-
-#pragma mark - Temporary Object
-+ (instancetype)uncachedObject;
-- (instancetype)uncachedCopy;
++ (instancetype)uncachedObjectWithId:(NSString *)objectId;
 
 @end

@@ -17,25 +17,44 @@
 // limitations under the License.
 
 #import "BaseModelObject.h"
-#import <objc/runtime.h>
+#import "ModelReference.h"
+@import ObjectiveC.runtime;
 
 
 
 @interface BaseModelObject ()
 
-MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
-@property (nonatomic, weak, readwrite) NSObject<ObjectCacheManagerProtocol> *cacheManager;
-@property (nonatomic) BOOL isTempObject;
+@property (nonatomic)                   NSString                            *objectId;
+@property (nonatomic, weak, readwrite)  NSObject<ObjectCacheManagerProtocol>*cacheManager;
+@property (nonatomic)                   BOOL                                isTempObject;
 
 @end
 
 
 
 @implementation BaseModelObject
-
+@synthesize cacheManager = _cacheManager;
+@synthesize isTempObject = _isTempObject;
+@synthesize objectId = _objectId;
 
 
 #pragma mark - Initialization
+
++ (BOOL)archiveUniquely {
+    return YES;
+}
+
+- (BOOL)archiveUniquely {
+    return self.class.archiveUniquely;
+}
+
++ (NSString *)cacheKeyForId:(NSString *)objectId {
+    return [NSStringFromClass(self) stringByAppendingFormat:@"__%@", objectId];
+}
+
+- (NSString *)cacheKey {
+    return [self.class cacheKeyForId:self.objectId];
+}
 
 + (NSString *)objectIdFromDict:(NSDictionary *)dict {
     return dict[self.objectIdFieldName];
@@ -45,7 +64,7 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     return @"id";
 }
 
-+ (Class)classFromDict:(NSDictionary *)dict __attribute__((pure)) {
++ (Class)classFromDict:(__unused NSDictionary *)dict __attribute__((pure)) {
     return self.class;
 }
 
@@ -103,6 +122,7 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     if (objectId.length > 0) {
         BaseModelObject *m = [[self alloc] init];
         m.objectId = objectId;
+        NSParameterAssert(m.objectId.length > 0);
         return m;
     }
     return nil;
@@ -111,27 +131,27 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 #pragma mark - Temporary Object
 
 + (instancetype)uncachedObject {
-    BaseModelObject *m = [self newObjectWithId:self.newTemporaryId];
+    BaseModelObject *m = [[self.class alloc] init];
+    m.isTempObject = YES;
     return m;
-}
-
-+ (NSString *)newTemporaryId {
-    return [NSString stringWithFormat:@"temp_%f_%d",
-                        [[NSDate date] timeIntervalSince1970],
-                        arc4random() % 10000
-                        ];
-
 }
 
 - (instancetype)uncachedCopy {
     BaseModelObject *m = self.copy;
-    m.objectId = [self.class newTemporaryId];
     m.isTempObject = YES;
+    m.cacheManager = nil;
+    return m;
+}
+
++ (instancetype)uncachedObjectWithId:(NSString *)objectId {
+    BaseModelObject *m = [[self.class alloc] init];
+    m.objectId = objectId;
     return m;
 }
 
 
 #pragma mark - Object updating
+
 - (BOOL)updateWithDictionary:(NSDictionary *)dict {
     if (dict[self.class.objectIdFieldName]) {
         SET_NONPRIMITIVE_IF_VAL_NOT_NIL([NSString class],
@@ -156,9 +176,9 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     objc_property_t *properties = class_copyPropertyList(c, &i);
     for (unsigned int ii = 0; ii < i; ii++) {
         objc_property_t property = properties[ii];
-
+        
         NSString *name = [NSString stringWithUTF8String:property_getName(property)];
-
+        
         const char *pa = property_getAttributes(property);
         NSString *propType = [NSString stringWithUTF8String:pa];
         if ([propType rangeOfString:@"R"].location == NSNotFound) {
@@ -218,8 +238,55 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
 
 #pragma mark - NSCopying
 
-- (id)copyWithZone:(NSZone *)zone {
-    BaseModelObject *bm = [self.class newObjectWithId:self.objectId];
+- (void)encodeWithCoder:(NSCoder *)aCoder {
+    for (NSString *propName in self.writeablePropertyNames) {
+        NSObject *obj = [self valueForKey:propName];
+        if ([obj conformsToProtocol:@protocol(NSCopying)]) {
+            if ([obj conformsToProtocol:@protocol(ObjectArchivingProtocol)] &&
+                ((NSObject<ObjectArchivingProtocol> *)obj).archiveUniquely) {
+                ModelReference *r = [ModelReference newObjectWithId:((NSObject <ObjectIdProtocol> *)obj).objectId];
+                r.className = NSStringFromClass(obj.class);
+                [aCoder encodeObject:r
+                              forKey:propName];
+            }
+            else {
+                [aCoder encodeObject:obj
+                              forKey:propName];
+            }
+        }
+    }
+}
+
+- (instancetype)initWithCoder:(NSCoder *)aDecoder {
+    self = [super init];
+    if (!self) {
+        return nil;
+    }
+    
+    for (NSString *propName in self.writeablePropertyNames) {
+        
+        NSObject *obj = [aDecoder decodeObjectForKey:propName];
+        if (obj) {
+            if ([obj isKindOfClass:[ModelReference class]]) {
+                ModelReference *mObj = (ModelReference *)obj;
+                Class c = NSClassFromString(mObj.className);
+                BaseModelObject *bm = [c objectWithId:mObj.objectId
+                 inCacheManager:self.cacheManager];
+                [self setValue:bm
+                    forKeyPath:propName];
+            }
+            else {
+                [self setValue:obj
+                        forKey:propName];
+            }
+        }
+    }
+    return self;
+}
+
+
+- (instancetype)copyWithZone:(NSZone *)zone {
+    BaseModelObject *bm = [[self.class alloc] init];
     
     for (NSString *propName in self.writeablePropertyNames) {
         id prop = [self valueForKey:propName];
@@ -230,4 +297,5 @@ MODEL_SINGLE_PROPERTY_M_INTERFACE(NSString, objectId);
     }
     return bm;
 }
+
 @end

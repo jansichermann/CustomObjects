@@ -10,6 +10,14 @@
 
 
 
+@protocol ObjectArchivingProtocol <NSObject>
+
+- (BOOL)archiveUniquely;
+
+@end
+
+
+
 @protocol ObjectIdProtocol <NSObject>
 
 - (NSString *)objectId;
@@ -28,5 +36,15 @@
 
 @optional
 - (void)clearCache;
+
+@end
+
+@protocol CacheableObjectProtocol <NSObject>
+
++ (NSString *)cacheKeyForId:(NSString *)objectId;
+- (NSString *)cacheKey;
+
+@optional
+- (void)setCacheManager:(NSObject<ObjectCacheManagerProtocol> *)cacheManager;
 
 @end

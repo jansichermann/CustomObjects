@@ -19,13 +19,10 @@
 #import "ModelManager.h"
 
 
-static const NSUInteger DEFAULT_CACHE_LIMIT = 0;
-
-
 
 @interface ModelManager () <NSCacheDelegate>
 
-@property               NSDictionary            *modelCache;
+@property (atomic)               NSCache *cache;
 
 @end
 
@@ -45,99 +42,61 @@ static const NSUInteger DEFAULT_CACHE_LIMIT = 0;
     [self clearCache];
 }
 
-#pragma mark - Cache Creation
-
-- (NSCache *)cacheForClass:(Class)class {
-    return self.modelCache[[self stringNameForClass:class]];
-}
-
-- (NSString *)stringNameForClass:(Class)class {
-    NSParameterAssert(class != nil);
-    return NSStringFromClass(class);
-}
-
-- (NSCache *)createCacheForClass:(Class)class {
-    NSParameterAssert(class != nil);
-    
-    NSString *cacheKey = [self stringNameForClass:class];
-    NSParameterAssert(cacheKey.length > 0);
-    
-    NSCache *cache = [[NSCache alloc] init];
-    NSParameterAssert(cache);
-    cache.totalCostLimit = DEFAULT_CACHE_LIMIT;
-    
-    // We do this as with an immutable copy as it provides
-    // better thread safety for future compatability
-    if (self.modelCache) {
-        NSArray *objects = self.modelCache.allValues;
-        NSArray *keys = self.modelCache.allKeys;
-        NSAssert(objects, @"Expected objects");
-        NSAssert(keys, @"Expected keys");
-        self.modelCache =
-        [[NSDictionary alloc] initWithObjects:[objects arrayByAddingObject:cache]
-                                      forKeys:[keys arrayByAddingObject:cacheKey]];
-    }
-    else {
-        self.modelCache = @{cacheKey : cache};
-    }
-    
-    NSParameterAssert(self.modelCache != nil);
-    
-    return cache;
-}
-
-
 #pragma mark - Object Addition, Removal
 
 - (void)clearCache {
-    self.modelCache = nil;
+    self.cache = [[NSCache alloc] init];
+    self.cache.delegate = self;
 }
 
-- (void)_removeObjectFromCache:(NSObject<ObjectIdProtocol> *)object {
-    NSCache *cache = [self cacheForClass:object.class];
-    [cache removeObjectForKey:object.objectId];
+- (void)_removeObjectFromCache:(NSObject<ObjectIdProtocol, CacheableObjectProtocol> *)object {
+    [self.cache removeObjectForKey:[object cacheKey]];
 }
 
-- (void)removeObjectFromCache:(NSObject<ObjectIdProtocol> *)object {
+- (void)removeObjectFromCache:(NSObject<ObjectIdProtocol, CacheableObjectProtocol> *)object {
+    NSParameterAssert([object conformsToProtocol:@protocol(ObjectIdProtocol)]);
+    NSParameterAssert([object conformsToProtocol:@protocol(CacheableObjectProtocol)]);
     NSParameterAssert(object.objectId.length > 0);
     [self _removeObjectFromCache:object];
 }
 
-- (void)_addObjectToCache:(NSObject<ObjectIdProtocol> *)object {
+- (void)_addObjectToCache:(NSObject<ObjectIdProtocol, CacheableObjectProtocol> *)object {
+    NSParameterAssert([object conformsToProtocol:@protocol(ObjectIdProtocol)]);
+    NSParameterAssert([object conformsToProtocol:@protocol(CacheableObjectProtocol)]);
     NSParameterAssert(object.objectId.length > 0);
     NSParameterAssert([[NSThread currentThread] isMainThread]);
     NSParameterAssert(!object.isTempObject);
     
-    NSCache *cache = [self cacheForClass:object.class];
-    
-    if (cache == nil) {
-        cache = [self createCacheForClass:object.class];
-    }
-    
-    NSParameterAssert(cache);
-    [cache setObject:object
-              forKey:object.objectId];
+    [self.cache setObject:object
+                   forKey:[object cacheKey]];
 }
 
-- (void)addObjectToCache:(NSObject<ObjectIdProtocol> *)object {
-    NSParameterAssert(object.objectId.length > 0);
+- (void)addObjectToCache:(NSObject<ObjectIdProtocol, CacheableObjectProtocol> *)object {
+    
+    if (!object) {
+        return;
+    }
+    
     NSParameterAssert([[NSThread currentThread] isMainThread]);
+    if ([object respondsToSelector:@selector(setCacheManager:)]) {
+        object.cacheManager = self;
+    }
     [self _addObjectToCache:object];
 }
 
 
 #pragma mark - Object Retrieval
 
-- (NSObject<ObjectIdProtocol> *)_fetchObjectFromCacheWithClass:(Class)c
-                                              andId:(NSString *)objectId {
-    NSCache *cache = [self cacheForClass:c];
-    return [cache objectForKey:objectId];
+- (NSObject<ObjectIdProtocol, CacheableObjectProtocol> *)_fetchObjectFromCacheWithClass:(Class)c
+                                                                                  andId:(NSString *)objectId {
+    return [self.cache objectForKey:[c cacheKeyForId:objectId]];
 }
 
-- (NSObject<ObjectIdProtocol> *)fetchObjectFromCacheWithClass:(Class)c
-                                             andId:(NSString *)objectId {
-    NSObject<ObjectIdProtocol> *bm = [self _fetchObjectFromCacheWithClass:c
-                                                         andId:objectId];
+- (NSObject<ObjectIdProtocol, CacheableObjectProtocol> *)fetchObjectFromCacheWithClass:(Class)c
+                                                                                 andId:(NSString *)objectId {
+    NSObject<ObjectIdProtocol, CacheableObjectProtocol> *bm =
+    [self _fetchObjectFromCacheWithClass:c
+                                   andId:objectId];
     return bm;
 }
 
