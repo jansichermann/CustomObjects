@@ -27,6 +27,17 @@
 
 
 
+
+@protocol PersistanceProtocol <NSObject>
+
+- (void)js__persistToPath:(NSString *)path;
++ (instancetype)js__loadFromPath:(NSString *)path;
+
+@end
+
+
+
+
 @protocol ObjectCacheManagerProtocol <NSObject>
 
 - (void)addObjectToCache:(NSObject <ObjectIdProtocol> *)object;

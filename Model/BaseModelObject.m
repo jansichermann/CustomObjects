@@ -40,6 +40,9 @@
 
 #pragma mark - Initialization
 
+// determines whether the object
+// is archived as part of its parent
+// or by itself and its parent holds a reference
 + (BOOL)archiveUniquely {
     return YES;
 }
@@ -57,7 +60,11 @@
 }
 
 + (NSString *)objectIdFromDict:(NSDictionary *)dict {
-    return dict[self.objectIdFieldName];
+    NSObject *obj = dict[self.objectIdFieldName];
+    if ([obj isKindOfClass:[NSString class]]) {
+        return (NSString *)obj;
+    }
+    return nil;
 }
 
 + (NSString *)objectIdFieldName __attribute__((const)) {
@@ -96,7 +103,7 @@
     BaseModelObject *obj = [c objectWithId:objectId
                             inCacheManager:cacheManager];
     
-    NSParameterAssert(obj.cacheManager != nil);
+    obj.cacheManager = cacheManager;
     [obj updateWithDictionary:dict];
     
     return obj;
@@ -104,17 +111,21 @@
 
 + (id)objectWithId:(NSString *)objectId
     inCacheManager:(NSObject <ObjectCacheManagerProtocol> *)cacheManager {
+    
     BaseModelObject *obj =
     (BaseModelObject *)[cacheManager fetchObjectFromCacheWithClass:self.class
                                                              andId:objectId];
     
     if (!obj) {
-        obj =
-        [self.class newObjectWithId:objectId];
+        obj = [self.class newObjectWithId:objectId];
+        
         [cacheManager addObjectToCache:obj];
+        
         obj.cacheManager = cacheManager;
     }
+    
     NSParameterAssert([obj isKindOfClass:[BaseModelObject class]]);
+    
     return obj;
 }
 
@@ -241,11 +252,16 @@
 - (void)encodeWithCoder:(NSCoder *)aCoder {
     for (NSString *propName in self.writeablePropertyNames) {
         NSObject *obj = [self valueForKey:propName];
+        
         if ([obj conformsToProtocol:@protocol(NSCopying)]) {
+            
             if ([obj conformsToProtocol:@protocol(ObjectArchivingProtocol)] &&
                 ((NSObject<ObjectArchivingProtocol> *)obj).archiveUniquely) {
-                ModelReference *r = [ModelReference newObjectWithId:((NSObject <ObjectIdProtocol> *)obj).objectId];
+                
+                ModelReference *r =
+                [ModelReference newObjectWithId:((NSObject <ObjectIdProtocol> *)obj).objectId];
                 r.className = NSStringFromClass(obj.class);
+                
                 [aCoder encodeObject:r
                               forKey:propName];
             }
@@ -271,7 +287,7 @@
                 ModelReference *mObj = (ModelReference *)obj;
                 Class c = NSClassFromString(mObj.className);
                 BaseModelObject *bm = [c objectWithId:mObj.objectId
-                 inCacheManager:self.cacheManager];
+                                       inCacheManager:self.cacheManager];
                 [self setValue:bm
                     forKeyPath:propName];
             }

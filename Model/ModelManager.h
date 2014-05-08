@@ -22,4 +22,12 @@
 
 @interface ModelManager : NSObject <ObjectCacheManagerProtocol>
 
++ (void)persistObject:(NSObject <ObjectIdProtocol,
+                       PersistanceProtocol,
+                       CacheableObjectProtocol> *)object;
+
+- (NSArray *)diskObjectsForClass:(Class)c;
+
+- (void)reset;
+
 @end
